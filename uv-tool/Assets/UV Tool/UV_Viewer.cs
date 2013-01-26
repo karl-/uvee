@@ -42,6 +42,8 @@ public class UV_Viewer : EditorWindow {
 	const int UV_DOT_SIZE = 4;
 
 	Color[] COLOR_ARRAY = new Color[5];
+
+	Color DRAG_BOX_COLOR = new Color(0f, 0f, .6f, .3f);
 #endregion
 
 #region GUI MEMBERS
@@ -98,46 +100,59 @@ public class UV_Viewer : EditorWindow {
 	    	Repaint();
 	}
 
+	Vector2 drag_start; 
+	bool mouseDragging = false;
 	void OnGUI()
 	{
 		//** Handle events **//
+
+		Event e = Event.current;
+		if(e.isMouse)
 		{
-			Event e = Event.current;
-			if(e.isMouse)
+			if(e.button == 2 || (e.modifiers == EventModifiers.Alt && e.button == 0))
 			{
-				if(e.button == 2 || (e.modifiers == EventModifiers.Alt && e.button == 0))
-				{
-					if(e.type == EventType.MouseDown) {
-						start = e.mousePosition;
-						dragging = true;
-					}
+				if(e.type == EventType.MouseDown) {
+					start = e.mousePosition;
+					dragging = true;
+				}
 
-					if(dragging) {
-						offset = offset + (e.mousePosition - start);
-						start = e.mousePosition;
-						Repaint();
-					}
+				if(dragging) {
+					offset = offset + (e.mousePosition - start);
+					start = e.mousePosition;
+					Repaint();
+				}
 
-					if(e.type == EventType.MouseUp || e.type == EventType.Ignore) {
-						dragging = false;
-					}
+				if(e.type == EventType.MouseUp || e.type == EventType.Ignore) {
+					dragging = false;
 				}
 			}
 
-			// SCale
-			if(e.type == EventType.ScrollWheel)
-			{
-				float modifier = -1f;
-				workspace_scale = (int)Mathf.Clamp(workspace_scale + (e.delta.y * modifier), MIN_ZOOM, MAX_ZOOM);
-				Repaint();
+			// USER INPUT THAT CAN BE DRAWN
+			if(e.type == EventType.MouseDown && e.button == 0) {
+				drag_start = e.mousePosition;
+				mouseDragging = true;
 			}
 
-			if(e.isKey && e.keyCode == KeyCode.Alpha0) {
-				offset = Vector2.zero;
-				workspace_scale = 100;
-				Repaint();
+			if(e.type == EventType.MouseUp && e.button == 0) {
+				mouseDragging = false;
 			}
+
 		}
+
+		// SCale
+		if(e.type == EventType.ScrollWheel)
+		{
+			float modifier = -1f;
+			workspace_scale = (int)Mathf.Clamp(workspace_scale + (e.delta.y * modifier), MIN_ZOOM, MAX_ZOOM);
+			Repaint();
+		}
+
+		if(e.isKey && e.keyCode == KeyCode.Alpha0) {
+			offset = Vector2.zero;
+			workspace_scale = 100;
+			Repaint();
+		}
+
 
 		DrawGraphBase();
 
@@ -176,8 +191,17 @@ public class UV_Viewer : EditorWindow {
 					settingsBoxHeight = compactSettingsHeight;
 			GUI.EndGroup();
 		}
-				
-		// DrawBoundingBox();	
+
+		Handles.BeginGUI();
+		Handles.color = Color.black;
+			Handles.PositionHandle(new Vector3(e.mousePosition.x, e.mousePosition.y, 0f), Quaternion.identity);
+		Handles.color = Color.white;
+		Handles.EndGUI();
+
+		if(mouseDragging) {
+			DrawBox(drag_start, e.mousePosition, DRAG_BOX_COLOR);
+			Repaint();
+		}
 	}
 #endregion
 
@@ -245,15 +269,33 @@ public class UV_Viewer : EditorWindow {
 		}
 	}
 
+	public void DrawBox(Vector2 p0, Vector2 p1, Color col)
+	{
+		GUI.backgroundColor = col;
+		GUI.Box(GUIRectWithPoints(p0, p1), "");
+		GUI.backgroundColor = Color.white;
+	}
+
 	public void DrawTriangles(MeshFilter[] mfs)
 	{
-		foreach(MeshFilter mf in mfs)
-		{
-			for(int i = 0; i < mf.triangles.Length-1; i++)
-			{
-				
-			}
-		}
+		// Handles.BeginGUI();
+		// Handles.color = Color.black;
+
+		// foreach(MeshFilter mf in mfs)
+		// {
+		// 	Vector2[] uv = mf.sharedMesh.uv;
+		// 	int[] tri = mf.sharedMesh.triangles;
+		// 	for(int i = 0; i < mf.sharedMesh.triangles.Length-1; i++)
+		// 	{
+		// 		Vector3 p0 = UVToGUIPoint(uv[tri[i]]);
+		// 		Vector3 p1 = UVToGUIPoint(uv[tri[i+1]]);
+
+		// 		Handles.DrawLine(p0, p1);
+		// 	}
+		// }
+
+		// Handles.color = Color.white;
+		// Handles.EndGUI();
 	}
 
 	public void DrawBoundingBox(List<Vector2> points)
@@ -284,6 +326,18 @@ public class UV_Viewer : EditorWindow {
 		COLOR_ARRAY[2] = Color.blue;
 		COLOR_ARRAY[3] = Color.black;
 		COLOR_ARRAY[4] = Color.magenta;
+	}
+
+	// Returns a rect in GUI coordinates
+	public Rect GUIRectWithPoints(Vector2 p0, Vector2 p1)
+	{
+		float minX = p0.x < p1.x ? p0.x : p1.x;
+		float minY = p0.y < p1.y ? p0.y : p1.y;
+
+		float maxX = p0.x > p1.x ? p0.x : p1.x;
+		float maxY = p0.y > p1.y ? p0.y : p1.y;
+
+		return new Rect(minX, minY, maxX - minX, maxY - minY);
 	}
 
 	public Vector2 Vector2ArrayMin(List<Vector2> val)
