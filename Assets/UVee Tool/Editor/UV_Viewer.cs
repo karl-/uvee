@@ -38,6 +38,7 @@ public class UV_Viewer : EditorWindow {
 	const int MAX_ZOOM = 400;
 
 	const int LINE_WIDTH = 1;
+	Color LINE_COLOR = Color.gray;
 
 	const int UV_DOT_SIZE = 4;
 
@@ -60,11 +61,9 @@ public class UV_Viewer : EditorWindow {
 
 	float scale = 0f;
 
-	Color LINE_COLOR = Color.blue;
-
-	int expandedSettingsHeight = 136;
+	int expandedSettingsHeight = 160;
 	int compactSettingsHeight = 50;
-	int settingsBoxHeight = 130;
+	int settingsBoxHeight;
 
 	int settingsBoxPad = 10;
 	int settingsMaxWidth = 0;
@@ -77,7 +76,7 @@ public class UV_Viewer : EditorWindow {
 
 #region INITIALIZATION
 	
-	[MenuItem("Window/UV Viewer")]
+	[MenuItem("Window/UVee Window")]
 	public static void Init()
 	{
 		EditorWindow.GetWindow(typeof(UV_Viewer), true, "UV Viewer", true);
@@ -128,7 +127,7 @@ public class UV_Viewer : EditorWindow {
 			}
 
 			// USER INPUT THAT CAN BE DRAWN
-			if(e.type == EventType.MouseDown && e.button == 0) {
+			if(e.type == EventType.MouseDown && e.button == 0 && !settingsBoxRect.Contains(e.mousePosition)) {
 				drag_start = e.mousePosition;
 				mouseDragging = true;
 			}
@@ -153,7 +152,6 @@ public class UV_Viewer : EditorWindow {
 			Repaint();
 		}
 
-
 		DrawGraphBase();
 
 		for(int i = 0; i < selection.Length; i++)
@@ -161,6 +159,10 @@ public class UV_Viewer : EditorWindow {
 
 		if(drawTriangles)
 			DrawTriangles(selection);
+
+		if(drawBoundingBox)
+			for(int i = 0; i < selection.Length; i++)
+				DrawBoundingBox(selection[i].sharedMesh.uv);
 
 		//** Draw Preferences Pane **//
 		{
@@ -180,7 +182,8 @@ public class UV_Viewer : EditorWindow {
 					uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
 					
 					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
-					
+					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
+
 					GUI.changed = false;
 					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(settingsMaxWidth));
 					if(GUI.changed) OnSelectionChange();
@@ -191,12 +194,6 @@ public class UV_Viewer : EditorWindow {
 					settingsBoxHeight = compactSettingsHeight;
 			GUI.EndGroup();
 		}
-
-		Handles.BeginGUI();
-		Handles.color = Color.black;
-			Handles.PositionHandle(new Vector3(e.mousePosition.x, e.mousePosition.y, 0f), Quaternion.identity);
-		Handles.color = Color.white;
-		Handles.EndGUI();
 
 		if(mouseDragging) {
 			DrawBox(drag_start, e.mousePosition, DRAG_BOX_COLOR);
@@ -278,32 +275,36 @@ public class UV_Viewer : EditorWindow {
 
 	public void DrawTriangles(MeshFilter[] mfs)
 	{
-		// Handles.BeginGUI();
-		// Handles.color = Color.black;
+		Handles.BeginGUI();
+		Handles.color = Color.black;
 
-		// foreach(MeshFilter mf in mfs)
-		// {
-		// 	Vector2[] uv = mf.sharedMesh.uv;
-		// 	int[] tri = mf.sharedMesh.triangles;
-		// 	for(int i = 0; i < mf.sharedMesh.triangles.Length-1; i++)
-		// 	{
-		// 		Vector3 p0 = UVToGUIPoint(uv[tri[i]]);
-		// 		Vector3 p1 = UVToGUIPoint(uv[tri[i+1]]);
+		// doesn't support any different winding types yet
+		foreach(MeshFilter mf in mfs)
+		{
+			Vector2[] uv = mf.sharedMesh.uv;
+			int[] tri = mf.sharedMesh.triangles;
+			for(int i = 0; i < mf.sharedMesh.triangles.Length; i+=3)
+			{
+				Vector3 p0 = UVToGUIPoint(uv[tri[i+0]]);
+				Vector3 p1 = UVToGUIPoint(uv[tri[i+1]]);
+				Vector3 p2 = UVToGUIPoint(uv[tri[i+2]]);
 
-		// 		Handles.DrawLine(p0, p1);
-		// 	}
-		// }
+				Handles.DrawLine(p0, p1);
+				Handles.DrawLine(p1, p2);
+				Handles.DrawLine(p2, p0);
+			}
+		}
 
-		// Handles.color = Color.white;
-		// Handles.EndGUI();
+		Handles.color = Color.white;
+		Handles.EndGUI();
 	}
 
-	public void DrawBoundingBox(List<Vector2> points)
+	public void DrawBoundingBox(Vector2[] points)
 	{
 		Vector2 min = Vector2ArrayMin(points);
 		Vector2 max = Vector2ArrayMax(points);
 		
-		GUI.color = new Color(.2f, .2f, .2f, .2f);
+		GUI.color = new Color(.2f, .2f, .2f, 2f);
 			GUI.Box( new Rect( min.x, min.y, max.x - min.x, max.y-min.y), "");
 		GUI.color = Color.white;
 	}
@@ -340,9 +341,9 @@ public class UV_Viewer : EditorWindow {
 		return new Rect(minX, minY, maxX - minX, maxY - minY);
 	}
 
-	public Vector2 Vector2ArrayMin(List<Vector2> val)
+	public Vector2 Vector2ArrayMin(Vector2[] val)
 	{
-		if(val == null || val.Count < 1)
+		if(val == null || val.Length < 1)
 			return Vector2.zero;
 
 		float x = val[0].x, y = val[0].y;
@@ -357,9 +358,9 @@ public class UV_Viewer : EditorWindow {
 		return new Vector2(x, y);
 	}
 
-	public Vector2 Vector2ArrayMax(List<Vector2> val)
+	public Vector2 Vector2ArrayMax(Vector2[] val)
 	{
-		if(val == null || val.Count < 1)
+		if(val == null || val.Length < 1)
 			return Vector2.zero;
 
 		float x = val[0].x, y = val[0].y;
