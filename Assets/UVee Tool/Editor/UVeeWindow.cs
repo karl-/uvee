@@ -127,7 +127,7 @@ public class UVeeWindow : EditorWindow {
 			}
 
 			// USER INPUT THAT CAN BE DRAWN
-			if(e.type == EventType.MouseDown && e.button == 0 && !settingsBoxRect.Contains(e.mousePosition)) {
+			if(e.type == EventType.MouseDown && e.button == 0 && !settingsBoxRect.Contains(e.mousePosition) && e.modifiers != EventModifiers.Alt) {
 				drag_start = e.mousePosition;
 				mouseDragging = true;
 			}
