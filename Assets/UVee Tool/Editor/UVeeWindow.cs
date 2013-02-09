@@ -1,4 +1,5 @@
 #pragma warning disable 0649, 0219
+#define DEBUG
 
 using UnityEngine;
 using UnityEditor;
@@ -273,7 +274,9 @@ public class UVeeWindow : EditorWindow {
 	public void DrawPoints(Vector2[] points, Color col)
 	{
 		halfDot = UV_DOT_SIZE / 2;
-
+#if DEBUG
+		float start = (float)EditorApplication.timeSinceStartup;
+#endif
 		foreach(Vector2 uv_coord in points)
 		{
 			Vector2 guiPoint = UVToGUIPoint(uv_coord);
@@ -284,6 +287,9 @@ public class UVeeWindow : EditorWindow {
 			if(showCoordinates)
 				GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + uv_coord);
 		}
+#if DEBUG
+		LogMethodTime("DrawPoints", (float)EditorApplication.timeSinceStartup - start);
+#endif
 	}
 
 	public void DrawBox(Vector2 p0, Vector2 p1, Color col)
@@ -295,6 +301,9 @@ public class UVeeWindow : EditorWindow {
 
 	public void DrawTriangles(MeshFilter[] mfs, List<int>[] selected)
 	{
+#if DEBUG
+		float start = (float)EditorApplication.timeSinceStartup;
+#endif
 		Handles.BeginGUI();
 		Handles.color = Color.black;
 
@@ -306,22 +315,43 @@ public class UVeeWindow : EditorWindow {
 
 			for(int n = 0; n < mfs[i].sharedMesh.triangles.Length; n+=3)
 			{
+#if DEBUG
+				float uvguipointstart = (float)EditorApplication.timeSinceStartup;
+#endif
 				Vector3 p0 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+0]]);
 				Vector3 p1 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+1]]);
 				Vector3 p2 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+2]]);
+#if DEBUG
+				LogMethodTime("UVToGUIPoint Conversion", (float)EditorApplication.timeSinceStartup - uvguipointstart);
+#endif
 
+#if DEBUG
+				float tristart = (float)EditorApplication.timeSinceStartup;
+#endif
 				bool p1_s = tri.Contains(mfs[i].sharedMesh.triangles[n+1]);
 				bool p0_s = tri.Contains(mfs[i].sharedMesh.triangles[n+0]);
 				bool p2_s = tri.Contains(mfs[i].sharedMesh.triangles[n+2]);
+#if DEBUG
+				LogMethodTime("Tri Contains", (float)EditorApplication.timeSinceStartup - tristart);
+#endif
 
+#if DEBUG
+				float handlesatrt = (float)EditorApplication.timeSinceStartup;
+#endif
 				if(p0_s && p1_s) Handles.DrawLine(p0, p1);
 				if(p1_s && p2_s) Handles.DrawLine(p1, p2);
 				if(p0_s && p2_s) Handles.DrawLine(p2, p0);
+#if DEBUG
+				LogMethodTime("Draw Triangle Handles", (float)EditorApplication.timeSinceStartup - handlesatrt);
+#endif
 			}
 		}
 
 		Handles.color = Color.white;
 		Handles.EndGUI();
+#if DEBUG
+		LogMethodTime("DrawTriangles", (float)EditorApplication.timeSinceStartup - start);
+#endif
 	}
 
 	public void DrawBoundingBox(Vector2[] points)
@@ -448,6 +478,34 @@ public class UVeeWindow : EditorWindow {
 		// u -= new Vector2(buttonSize/2f, buttonSize/2f);
 		u = new Vector2(Mathf.Round(u.x), Mathf.Round(u.y));
 		return u;
+	}
+#endregion
+
+#region DEBUG
+		
+	Dictionary<string, List<float>> methodExecutionTimes = new Dictionary<string, List<float>>();
+	public void LogMethodTime(string methodName, float time)
+	{
+		if(methodExecutionTimes.ContainsKey(methodName))
+			methodExecutionTimes[methodName].Add(time);
+		else
+			methodExecutionTimes.Add(methodName, new List<float>(new float[1]{time}));
+	}
+
+	public void OnDisable()
+	{
+		foreach(KeyValuePair<string, List<float>> kvp in methodExecutionTimes)
+		{
+			Debug.Log("Method: " + kvp.Key + "\nAvg. Time: " + Average(kvp.Value).ToString("F7"));
+		}
+	}
+
+	public float Average(List<float> list)
+	{
+		float avg = 0f;
+		for(int i = 0; i < list.Count; i++)
+			avg += list[i];
+		return avg/(float)list.Count;
 	}
 #endregion
 }
