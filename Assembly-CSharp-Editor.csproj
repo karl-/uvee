@@ -44,7 +44,10 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\Doxygen\Editor\DoxygenWindow.cs" />
      <Compile Include="Assets\UVee Tool\Editor\UVeeWindow.cs" />
+     <None Include="Assets\Doxygen\Editor\Resources\BaseDoxyfile.txt" />
+     <None Include="Assets\Doxygen\ReadMe.txt" />
  <Reference Include="AssetStoreTools">
  <HintPath>Assets\AssetStoreTools\Editor\AssetStoreTools.dll</HintPath>
  </Reference>

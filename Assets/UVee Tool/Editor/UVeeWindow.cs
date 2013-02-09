@@ -21,14 +21,15 @@ public class UVeeWindow : EditorWindow {
 	UVChannel uvChannel = UVChannel.UV;
 	bool showCoordinates = false;
 	bool showTex = true;
-	bool drawBoundingBox = true;
+	bool drawBoundingBox = false;
 	bool drawTriangles = true;
 #endregion
 
 #region DATA
 
 	MeshFilter[] selection = new MeshFilter[0];
-
+	int submesh = -1;
+	List<int>[] user_selection = new List<int>[0];
 	Texture2D tex;
 #endregion
 
@@ -126,6 +127,12 @@ public class UVeeWindow : EditorWindow {
 				}
 			}
 
+			// alt right click and drag == zoom
+			if(e.button == 1 && e.modifiers == EventModifiers.Alt)
+			{
+
+			}
+
 			// USER INPUT THAT CAN BE DRAWN
 			if(e.type == EventType.MouseDown && e.button == 0 && !settingsBoxRect.Contains(e.mousePosition) && e.modifiers != EventModifiers.Alt) {
 				drag_start = e.mousePosition;
@@ -134,6 +141,7 @@ public class UVeeWindow : EditorWindow {
 
 			if(e.type == EventType.MouseUp && e.button == 0) {
 				mouseDragging = false;
+				UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition));
 			}
 
 		}
@@ -155,10 +163,10 @@ public class UVeeWindow : EditorWindow {
 		DrawGraphBase();
 
 		for(int i = 0; i < selection.Length; i++)
-			DrawPoints( ((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2), COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+			DrawPoints( UVArrayWithTriangles(selection[i], user_selection[i]), COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 
 		if(drawTriangles)
-			DrawTriangles(selection);
+			DrawTriangles(selection, user_selection);
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
@@ -189,6 +197,13 @@ public class UVeeWindow : EditorWindow {
 					if(GUI.changed) OnSelectionChange();
 
 					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(settingsMaxWidth));
+					
+					string[] submeshes = new string[selection[0].sharedMesh.subMeshCount+1];
+					submeshes[0] = "All";
+					for(int i = 1; i < submeshes.Length; i++)
+						submeshes[i] = (i-1).ToString();
+
+					submesh = EditorGUILayout.Popup(submesh, submeshes);
 				}
 				else
 					settingsBoxHeight = compactSettingsHeight;
@@ -207,13 +222,16 @@ public class UVeeWindow : EditorWindow {
 	public void OnSelectionChange()
 	{
 		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
+		user_selection = new List<int>[selection.Length];
+
+		for(int i = 0; i < selection.Length; i++)
+			user_selection[i] = new List<int>(selection[i].sharedMesh.triangles);
+
 		if(selection != null && selection.Length > 0)
 			tex = (Texture2D)selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
 	}
 #endregion
-/**
- *	All drawing methods assume coordinates are already in GUI Space
- */
+
 #region DRAWING
 
 	public void DrawGraphBase()
@@ -275,25 +293,30 @@ public class UVeeWindow : EditorWindow {
 		GUI.backgroundColor = Color.white;
 	}
 
-	public void DrawTriangles(MeshFilter[] mfs)
+	public void DrawTriangles(MeshFilter[] mfs, List<int>[] selected)
 	{
 		Handles.BeginGUI();
 		Handles.color = Color.black;
 
 		// doesn't support any different winding types yet
-		foreach(MeshFilter mf in mfs)
+		for(int i = 0; i < mfs.Length; i++)
 		{
-			Vector2[] uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
-			int[] tri = mf.sharedMesh.triangles;
-			for(int i = 0; i < mf.sharedMesh.triangles.Length; i+=3)
-			{
-				Vector3 p0 = UVToGUIPoint(uv[tri[i+0]]);
-				Vector3 p1 = UVToGUIPoint(uv[tri[i+1]]);
-				Vector3 p2 = UVToGUIPoint(uv[tri[i+2]]);
+			Vector2[] uv = (uvChannel == UVChannel.UV) ? mfs[i].sharedMesh.uv : mfs[i].sharedMesh.uv2;
+			List<int> tri = selected[i];
 
-				Handles.DrawLine(p0, p1);
-				Handles.DrawLine(p1, p2);
-				Handles.DrawLine(p2, p0);
+			for(int n = 0; n < mfs[i].sharedMesh.triangles.Length; n+=3)
+			{
+				Vector3 p0 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+0]]);
+				Vector3 p1 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+1]]);
+				Vector3 p2 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+2]]);
+
+				bool p1_s = tri.Contains(mfs[i].sharedMesh.triangles[n+1]);
+				bool p0_s = tri.Contains(mfs[i].sharedMesh.triangles[n+0]);
+				bool p2_s = tri.Contains(mfs[i].sharedMesh.triangles[n+2]);
+
+				if(p0_s && p1_s) Handles.DrawLine(p0, p1);
+				if(p1_s && p2_s) Handles.DrawLine(p1, p2);
+				if(p0_s && p2_s) Handles.DrawLine(p2, p0);
 			}
 		}
 
@@ -329,6 +352,20 @@ public class UVeeWindow : EditorWindow {
 		COLOR_ARRAY[2] = Color.blue;
 		COLOR_ARRAY[3] = Color.black;
 		COLOR_ARRAY[4] = Color.magenta;
+	}
+
+	public Vector2[] UVArrayWithTriangles(MeshFilter mf, List<int> tris)
+	{
+		List<Vector2> uvs = new List<Vector2>();
+
+		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
+		for(int n = 0; n < tris.Count; n++)
+		{
+			// Debug.Log("N INDEX: " + n + "  n value: " + tris[n] + " / " + tris.Count);
+			uvs.Add( mf_uv[tris[n]] );
+		}
+
+		return uvs.ToArray();
 	}
 
 	// Returns a rect in GUI coordinates
@@ -378,7 +415,27 @@ public class UVeeWindow : EditorWindow {
 	}
 #endregion
 
-#region CONVERSION
+#region SCREEN TO UV SPACE CONVERSION AND CHECKS
+
+	public void UpdateSelectionWithGUIRect(Rect rect)
+	{
+		bool pointSelected = false;
+		for(int i = 0; i < selection.Length; i++)
+		{
+			user_selection[i].Clear();
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			for(int n = 0; n < selection[i].sharedMesh.triangles.Length; n++)
+			{
+				if(rect.Contains(UVToGUIPoint( uvs[selection[i].sharedMesh.triangles[n]])))
+				{
+					pointSelected = true;
+					user_selection[i].Add( selection[i].sharedMesh.triangles[n] );
+				}
+			}
+		}
+		if(!pointSelected)
+			OnSelectionChange();
+	}
 
 	public Vector2 UVToGUIPoint(Vector2 uv)
 	{
