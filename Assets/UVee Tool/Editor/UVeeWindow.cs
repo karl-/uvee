@@ -1,6 +1,12 @@
 #pragma warning disable 0649, 0219
 #define DEBUG
 
+// TODO:
+//	- Tile material preview
+//	- Click mesh to select uvs
+//	- add auto gen. uv2
+//	- make move tool more visible
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
@@ -225,11 +231,11 @@ public class UVeeWindow : EditorWindow {
 
 		if(drawTriangles)
 			for(int i = 0; i < selected_triangles.Length; i++)
-				DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
-
-		if(drawTriangles)
-			for(int i = 0; i < selected_triangles.Length; i++)
 				DrawLines(triangle_points[i], new Color(.2f, .2f, .2f, .2f));
+
+		// if(drawTriangles)
+		// 	for(int i = 0; i < selected_triangles.Length; i++)
+		// 		DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
@@ -405,6 +411,15 @@ public class UVeeWindow : EditorWindow {
 		for(int i = 0; i < selection.Length; i++)
 		{
 			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
+			if(uv_points[i] == null || uv_points[i].Length < 1)
+			{
+				user_points[i]					= new Vector2[0]{};
+				triangle_points[i]				= new Vector2[0]{};
+				user_triangle_points[i] 		= new Vector2[0]{};
+				distinct_triangle_selection[i] 	= new int[0]{};
+				continue;
+			}
+
 			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], distinct_triangle_selection[i]));
 			all_points.AddRange(user_points[i]);
@@ -657,6 +672,7 @@ public class UVeeWindow : EditorWindow {
 		List<Vector2> uvs = new List<Vector2>();
 
 		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
+		
 		if(mf_uv == null)
 			return new Vector2[0]{};
 
