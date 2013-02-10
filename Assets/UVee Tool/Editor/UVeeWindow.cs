@@ -38,6 +38,8 @@ public class UVeeWindow : EditorWindow {
 	Vector2[][] 	uv_points 		= new Vector2[0][];	// all uv points
 	Vector2[][] 	user_points 	= new Vector2[0][];
 	Vector2[][]		triangle_points = new Vector2[0][];	// wound in twos - so a triangle is { p0, p1, p1, p1, p2, p0 }
+	List<Vector2>	all_points 		= new List<Vector2>();
+	Vector2 uv_center = Vector2.zero;
 #endregion
 
 #region CONSTANT
@@ -58,6 +60,7 @@ public class UVeeWindow : EditorWindow {
 #region GUI MEMBERS
 
 	Texture2D dot;
+	Texture2D moveTool;
 	
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
@@ -95,13 +98,14 @@ public class UVeeWindow : EditorWindow {
 	public void OnEnable()
 	{	
 		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
+		moveTool = (Texture2D)Resources.Load("move", typeof(Texture2D));
 		PopulateColorArray();
 		OnSelectionChange();
 		Repaint();
 	}
 #endregion
 
-#region UPDATE
+#region GUI
 	
 	// force update window
 	void OnInspectorUpdate()
@@ -234,6 +238,9 @@ public class UVeeWindow : EditorWindow {
 			GUI.EndGroup();
 		}
 
+		// move tools	
+		GUI.DrawTexture(new Rect(uv_center.x - moveTool.width/2, uv_center.y - moveTool.height/2, moveTool.width, moveTool.height), moveTool);
+
 		if(mouseDragging) {
 			if(Vector2.Distance(drag_start, e.mousePosition) > 10)
 				DrawBox(drag_start, e.mousePosition, DRAG_BOX_COLOR);
@@ -249,6 +256,11 @@ public class UVeeWindow : EditorWindow {
 #endregion
 
 #region EVENT
+
+	public void OnFocus()
+	{
+		OnSelectionChange();
+	}
 
 	public void OnSelectionChange()
 	{
@@ -266,9 +278,7 @@ public class UVeeWindow : EditorWindow {
 
 	public void UpdateSelectionWithGUIRect(Rect rect)
 	{
-#if DEBUG
-		float start = (float)EditorApplication.timeSinceStartup;
-#endif			
+
 		bool pointSelected = false;
 		for(int i = 0; i < selection.Length; i++)
 		{
@@ -285,26 +295,24 @@ public class UVeeWindow : EditorWindow {
 		}
 		if(!pointSelected)
 			OnSelectionChange();
-#if DEBUG
-		LogMethodTime("UpdateSelectionWithGUIRect", (float)EditorApplication.timeSinceStartup - start);
-#endif		
+
 		UpdateGUIPointCache();
 	}
 
 	// Call after UVs are selected, or the GUI space has been modified
 	public void UpdateGUIPointCache()
 	{	
-#if DEBUG
-		float start = (float)EditorApplication.timeSinceStartup;
-#endif		
+	
 		uv_points = new Vector2[selection.Length][];
 		user_points = new Vector2[selection.Length][];
 		triangle_points = new Vector2[selection.Length][];
+		all_points = new List<Vector2>();
 
 		for(int i = 0; i < selection.Length; i++)
 		{
 			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
 			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], selected_triangles[i]));
+			all_points.AddRange(user_points[i]);
 
 			List<Vector2> lines = new List<Vector2>();
 			for(int n = 0; n < selection[i].sharedMesh.triangles.Length; n+=3)
@@ -323,9 +331,8 @@ public class UVeeWindow : EditorWindow {
 			}
 			triangle_points[i] = lines.ToArray();
 		}
-#if DEBUG
-		LogMethodTime("UpdateGUIPointCache", (float)EditorApplication.timeSinceStartup - start);
-#endif
+
+		uv_center = Average(all_points);
 	}
 #endregion
 
@@ -370,9 +377,7 @@ public class UVeeWindow : EditorWindow {
 	public void DrawPoints(Vector2[] points, Color col)
 	{
 		halfDot = UV_DOT_SIZE / 2;
-#if DEBUG
-		float start = (float)EditorApplication.timeSinceStartup;
-#endif
+
 		foreach(Vector2 guiPoint in points)
 		{
 			// Vector2 guiPoint = UVToGUIPoint(uv_coord);
@@ -383,9 +388,6 @@ public class UVeeWindow : EditorWindow {
 			// if(showCoordinates)
 			// 	GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + uv_coord);
 		}
-#if DEBUG
-		LogMethodTime("DrawPoints", (float)EditorApplication.timeSinceStartup - start);
-#endif
 	}
 
 	public void DrawBox(Vector2 p0, Vector2 p1, Color col)
@@ -560,6 +562,14 @@ public class UVeeWindow : EditorWindow {
 			avg += list[i];
 		return avg/(float)list.Count;
 	}
+
+	public Vector2 Average(List<Vector2> list)
+	{
+		Vector2 avg = Vector2.zero;
+		for(int i = 0; i < list.Count; i++)
+			avg += list[i];
+		return avg/(float)list.Count;
+	}	
 #endregion
 }
 
