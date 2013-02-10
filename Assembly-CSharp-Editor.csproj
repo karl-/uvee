@@ -45,7 +45,6 @@
   </ItemGroup>
   <ItemGroup>
      <Compile Include="Assets\Doxygen\Editor\DoxygenWindow.cs" />
-     <Compile Include="Assets\UVee Tool\Editor\ContainsTesting.cs" />
      <Compile Include="Assets\UVee Tool\Editor\UVeeWindow.cs" />
      <None Include="Assets\Doxygen\Editor\Resources\BaseDoxyfile.txt" />
      <None Include="Assets\Doxygen\ReadMe.txt" />
