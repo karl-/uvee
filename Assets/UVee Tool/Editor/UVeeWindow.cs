@@ -119,6 +119,11 @@ public class UVeeWindow : EditorWindow {
 	}
 #endregion
 
+#region GET EVENT
+
+	public bool UndoRedoPerformed { get { return Event.current.type == EventType.ValidateCommand && Event.current.commandName == "UndoRedoPerformed"; } }
+#endregion
+
 #region GUI
 	
 	// force update window
@@ -238,6 +243,11 @@ public class UVeeWindow : EditorWindow {
 			UpdateGUIPointCache();
 			Repaint();
 		}
+
+		if(UndoRedoPerformed) {
+			UpdateGUIPointCache();
+			Repaint();
+		}
 	}
 #endregion
 
@@ -324,8 +334,9 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
+			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
-			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], selected_triangles[i]));
+			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], distinct_triangle_selection[i]));
 			all_points.AddRange(user_points[i]);
 
 			int[] tris = selection[i].sharedMesh.triangles;
@@ -350,7 +361,7 @@ public class UVeeWindow : EditorWindow {
 
 			triangle_points[i] = lines.ToArray();
 			user_triangle_points[i] = u_lines.ToArray();
-			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
+			// Debug.Log(distinct_triangle_selection[i].ToFormattedString(", ") + "\n" + selected_triangles[i].ToArray().ToFormattedString(", "));
 		}
 
 		uv_center = Average(all_points);
@@ -408,8 +419,8 @@ public class UVeeWindow : EditorWindow {
 				GUI.DrawTexture(new Rect(guiPoint.x-halfDot, guiPoint.y-halfDot, UV_DOT_SIZE, UV_DOT_SIZE), dot, ScaleMode.ScaleToFit);
 			GUI.color = Color.white;
 
-			// if(showCoordinates)
-			// 	GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + uv_coord);
+			if(showCoordinates)
+				GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + GUIToUVPoint(guiPoint) );
 		}
 	}
 
@@ -459,8 +470,15 @@ public class UVeeWindow : EditorWindow {
 			{
 				settingsBoxHeight = expandedSettingsHeight;
 				workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(settingsMaxWidth));
-				uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
 				
+				GUI.changed = false;
+				uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
+				// if(GUI.changed)
+				// 	if(ChannelIsNull(uvChannel))
+				// 	{
+				// 		Debug.LogWarning("UV Channel not foound.");
+				// 		uvChannel = (int)uvChannel++/2;
+				// 	}
 				showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
 				drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
 
@@ -524,12 +542,14 @@ public class UVeeWindow : EditorWindow {
 
 	public void TranslateUVs(int[][] uv_selection, Vector2 uvDelta)
 	{
+		Vector2 d = uvDelta;
+		// Debug.Log(uvDelta.ToString("F7"));
 		for(int i = 0; i < selection.Length; i++)
 		{
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
 			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
-				uvs[uv_selection[i][n]] -= uvDelta;
+				uvs[uv_selection[i][n]] -= d;
 			}
 
 			if(uvChannel == UVChannel.UV)
@@ -559,11 +579,13 @@ public class UVeeWindow : EditorWindow {
 		COLOR_ARRAY[4] = Color.magenta;
 	}
 
-	public Vector2[] UVArrayWithTriangles(MeshFilter mf, HashSet<int> tris)
+	public Vector2[] UVArrayWithTriangles(MeshFilter mf, int[] tris)
 	{
 		List<Vector2> uvs = new List<Vector2>();
 
 		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
+		if(mf_uv == null)
+			return new Vector2[0]{};
 
 		foreach(int tri in tris)
 			uvs.Add(mf_uv[tri]);
@@ -733,5 +755,17 @@ public static class TransformExtensions
 				c.Add(t.gameObject);
 		}
 		return c.ToArray() as GameObject[];
+	}
+
+	public static string ToFormattedString(this int[] arr, string seperator)
+	{
+		if(arr == null || arr.Length < 1)
+			return "";
+
+		string str = "";
+		for(int i = 0; i < arr.Length-1; i++)
+			str += arr[i].ToString() + seperator;
+		str += arr[arr.Length-1];
+		return str;
 	}
 }
