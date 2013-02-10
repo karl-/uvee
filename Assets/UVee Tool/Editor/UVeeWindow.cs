@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
-
+using System.Linq;
 public class UVeeWindow : EditorWindow {
 
 #region ENUM
@@ -35,12 +35,15 @@ public class UVeeWindow : EditorWindow {
 	Texture2D tex;
 
 	// GUI draw caches
-	Vector2[][] 	uv_points 		= new Vector2[0][];	// all uv points
+	Vector2[][] 	uv_points 		= new Vector2[0][];			// all uv points
 	Vector2[][] 	user_points 	= new Vector2[0][];
-	Vector2[][]		triangle_points = new Vector2[0][];	// wound in twos - so a triangle is { p0, p1, p1, p1, p2, p0 }
+	Vector2[][]		triangle_points = new Vector2[0][];			// wound in twos - so a triangle is { p0, p1, p1, p1, p2, p0 }
 	Vector2[][]		user_triangle_points = new Vector2[0][];	// contains only selected triangles
 	List<Vector2>	all_points 		= new List<Vector2>();
 	Vector2 		uv_center 		= Vector2.zero;
+
+	// selection caches
+	int[][]			distinct_triangle_selection = new int[0][];	///< Guarantees that only one index per vertex is present
 #endregion
 
 #region CONSTANT
@@ -165,6 +168,10 @@ public class UVeeWindow : EditorWindow {
 			}
 		}
 
+		// dragging uvs around
+		if(e.isMouse && e.button == 0 && e.modifiers == (EventModifiers)0 && !settingsBoxRect.Contains(e.mousePosition) && moveToolRect.Contains(e.mousePosition))
+			UVMoveTool();
+
 		if(e.type == EventType.MouseUp && e.button == 0 && mouseDragging) {
 			mouseDragging = false;
 			UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition), e.modifiers == EventModifiers.Shift);
@@ -262,8 +269,6 @@ public class UVeeWindow : EditorWindow {
 		// avoid if checks if shift isn't held - (this loop is already slow, so take speed improvements where we can)
 		if(!shift)
 		{
-			float start = (float)EditorApplication.timeSinceStartup;
-
 			for(int i = 0; i < selection.Length; i++)
 			{
 				selected_triangles[i].Clear();
@@ -277,7 +282,6 @@ public class UVeeWindow : EditorWindow {
 					}
 				}
 			}
-			LogMethodTime("UpdateSelectionWithGUIRect", (float)EditorApplication.timeSinceStartup - start);
 		}
 		else
 		{
@@ -305,14 +309,15 @@ public class UVeeWindow : EditorWindow {
 	// Call after UVs are selected, or the GUI space has been modified
 	public void UpdateGUIPointCache()
 	{	
-	
-		uv_points = new Vector2[selection.Length][];
-		user_points = new Vector2[selection.Length][];
-		triangle_points = new Vector2[selection.Length][];
-		user_triangle_points = new Vector2[selection.Length][];
-		all_points = new List<Vector2>();
-
 		LogStart("UpdateGUIPointCache");
+
+		uv_points 					= new Vector2[selection.Length][];
+		user_points 				= new Vector2[selection.Length][];
+		triangle_points 			= new Vector2[selection.Length][];
+		user_triangle_points 		= new Vector2[selection.Length][];
+		distinct_triangle_selection = new int 	 [selection.Length][];
+
+		all_points = new List<Vector2>();
 
 		for(int i = 0; i < selection.Length; i++)
 		{
@@ -329,26 +334,25 @@ public class UVeeWindow : EditorWindow {
 				Vector2 p1 = uv_points[i][tris[n+1]];
 				Vector2 p2 = uv_points[i][tris[n+2]];
 
-				/**
-				 *	This code creates a triangle line array containing tris only for selected points.  Useful, but
-				 *	suuuper slow.
-				 */
+				// this could be sped up
 				bool p0_s = selected_triangles[i].Contains(tris[n+0]);
 				bool p1_s = selected_triangles[i].Contains(tris[n+1]);
 				bool p2_s = selected_triangles[i].Contains(tris[n+2]);
-
-				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
 				if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
 				if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
 				if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
+
+				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
 			}
+
 			triangle_points[i] = lines.ToArray();
 			user_triangle_points[i] = u_lines.ToArray();
+			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 		}
 
-		LogFinish("UpdateGUIPointCache");
-
 		uv_center = Average(all_points);
+
+		LogFinish("UpdateGUIPointCache");
 	}
 #endregion
 
@@ -473,6 +477,57 @@ public class UVeeWindow : EditorWindow {
 			else
 				settingsBoxHeight = compactSettingsHeight;
 		GUI.EndGroup();
+	}
+#endregion
+
+#region TOOLS
+	
+	bool dragging_uv = false;
+	Vector2 dragging_uv_start = Vector2.zero;
+	public void UVMoveTool()
+	{
+		Event e = Event.current;
+		if(e.type == EventType.MouseDown) 
+		{
+			dragging_uv = true;
+			dragging_uv_start = e.mousePosition;
+		}
+
+		if(dragging_uv)
+		{
+			Vector2 delta = GUIToUVPoint(dragging_uv_start) - GUIToUVPoint(e.mousePosition);
+			dragging_uv_start = e.mousePosition;
+			TranslateUVs(distinct_triangle_selection, delta);
+
+			Repaint();
+			UpdateGUIPointCache();
+		}
+
+		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
+		{
+			dragging_uv = false;
+			UpdateGUIPointCache();
+		}
+	}
+#endregion
+
+#region UV UTILITY
+
+	public void TranslateUVs(int[][] uv_selection, Vector2 uvDelta)
+	{
+		for(int i = 0; i < selection.Length; i++)
+		{
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			for(int n = 0; n < uv_selection.Length; n++)
+			{
+				uvs[uv_selection[i][n]] -= uvDelta;
+			}
+
+			if(uvChannel == UVChannel.UV)
+				selection[i].sharedMesh.uv = uvs;
+			else
+				selection[i].sharedMesh.uv2 = uvs;
+		}
 	}
 #endregion
 
@@ -615,7 +670,7 @@ public class UVeeWindow : EditorWindow {
 	{
 		foreach(KeyValuePair<string, List<float>> kvp in methodExecutionTimes)
 		{
-			Debug.Log("Method: " + kvp.Key + "\nAvg. Time: " + Average(kvp.Value).ToString("F7"));
+			Debug.Log("Method: " + kvp.Key + "\nAvg. Time: " + Average(kvp.Value).ToString("F7") + "\nSamples: " + kvp.Value.Count);
 		}
 	}
 
