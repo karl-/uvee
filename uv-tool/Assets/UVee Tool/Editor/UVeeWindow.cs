@@ -50,7 +50,7 @@ public class UVeeWindow : EditorWindow {
 #region CONSTANT
 
 	const int MIN_ZOOM = 25;
-	const int MAX_ZOOM = 400;
+	const int MAX_ZOOM = 800;
 
 	const int LINE_WIDTH = 1;
 	Color LINE_COLOR = Color.gray;
@@ -137,6 +137,8 @@ public class UVeeWindow : EditorWindow {
 
 	Vector2 drag_start; 
 	bool mouseDragging = false;
+	bool zoom_dragging = false;
+	Vector2 zoom_dragging_start = Vector2.zero;
 	void OnGUI()
 	{
 		//** Handle events **//
@@ -154,7 +156,6 @@ public class UVeeWindow : EditorWindow {
 				if(dragging) {
 					offset = offset + (e.mousePosition - start);
 					start = e.mousePosition;
-					Repaint();
 				}
 
 				if(e.type == EventType.MouseUp || e.type == EventType.Ignore) {
@@ -165,7 +166,22 @@ public class UVeeWindow : EditorWindow {
 			// alt right click and drag == zoom
 			if(e.button == 1 && e.modifiers == EventModifiers.Alt)
 			{
+				if(e.type == EventType.MouseDown) {
+					zoom_dragging = true;
+					zoom_dragging_start = e.mousePosition;
+				}
 
+				if(zoom_dragging) {
+					float modifier = -1f;
+					Vector2 delta = zoom_dragging_start - e.mousePosition;
+					zoom_dragging_start = e.mousePosition;
+					workspace_scale = (int)Mathf.Clamp(workspace_scale + ( (delta.x - delta.y) * modifier), MIN_ZOOM, MAX_ZOOM);
+				}
+
+				if( (e.type == EventType.MouseUp || e.type == EventType.Ignore) && zoom_dragging )
+				{
+					zoom_dragging = false;
+				}
 			}
 
 			// USER INPUT THAT CAN BE DRAWN
@@ -189,7 +205,6 @@ public class UVeeWindow : EditorWindow {
 		{
 			float modifier = -1f;
 			workspace_scale = (int)Mathf.Clamp(workspace_scale + (e.delta.y * modifier), MIN_ZOOM, MAX_ZOOM);
-			Repaint();
 			scrolling = true;
 		}
 
@@ -223,7 +238,6 @@ public class UVeeWindow : EditorWindow {
 		for(int i = 0; i < selection.Length; i++)
 			DrawPoints( user_points[i] );//, COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 
-
 		//** Draw Preferences Pane **//
 		DrawPreferencesPane();
 
@@ -238,11 +252,18 @@ public class UVeeWindow : EditorWindow {
 			Repaint();
 		}
 
-		if(dragging)	
+		if(dragging) {
 			UpdateGUIPointCache();
+			Repaint();
+		}
 
 		if(scrolling) {
 			scrolling = false;
+			UpdateGUIPointCache();
+			Repaint();
+		}
+
+		if(zoom_dragging) {
 			UpdateGUIPointCache();
 			Repaint();
 		}
