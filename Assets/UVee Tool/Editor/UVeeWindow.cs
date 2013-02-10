@@ -334,8 +334,8 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
+			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], distinct_triangle_selection[i]));
 			all_points.AddRange(user_points[i]);
 
@@ -523,11 +523,15 @@ public class UVeeWindow : EditorWindow {
 		if(dragging_uv)
 		{
 			Vector2 delta = GUIToUVPoint(dragging_uv_start) - GUIToUVPoint(e.mousePosition);
+
+			// because gui is called 2x?
+			delta /= 2f;
+
 			dragging_uv_start = e.mousePosition;
 			TranslateUVs(distinct_triangle_selection, delta);
 
-			Repaint();
 			UpdateGUIPointCache();
+			Repaint();
 		}
 
 		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
