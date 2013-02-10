@@ -38,8 +38,9 @@ public class UVeeWindow : EditorWindow {
 	Vector2[][] 	uv_points 		= new Vector2[0][];	// all uv points
 	Vector2[][] 	user_points 	= new Vector2[0][];
 	Vector2[][]		triangle_points = new Vector2[0][];	// wound in twos - so a triangle is { p0, p1, p1, p1, p2, p0 }
+	// Vector2[][]		user_triangle_points = new Vector2[0][];	// contains only selected triangles
 	List<Vector2>	all_points 		= new List<Vector2>();
-	Vector2 uv_center = Vector2.zero;
+	Vector2 		uv_center 		= Vector2.zero;
 #endregion
 
 #region CONSTANT
@@ -61,7 +62,17 @@ public class UVeeWindow : EditorWindow {
 
 	Texture2D dot;
 	Texture2D moveTool;
-	
+	Rect moveToolRect { get {
+			int size = 32;// = moveTool.width / (100/workspace_scale);
+
+			return new Rect(
+				uv_center.x - size/2,
+				uv_center.y - size/2,
+				size,
+				size);
+		}
+	}
+
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
 	Vector2 workspace = new Vector2(0f, 0f);		// max allowed size, padding inclusive
@@ -119,9 +130,9 @@ public class UVeeWindow : EditorWindow {
 	void OnGUI()
 	{
 		//** Handle events **//
-
 		Event e = Event.current;
-		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition))
+
+		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition) && !moveToolRect.Contains(e.mousePosition))
 		{
 			if(e.button == 2 || (e.modifiers == EventModifiers.Alt && e.button == 0))
 			{
@@ -154,12 +165,12 @@ public class UVeeWindow : EditorWindow {
 			}
 		}
 
-		if(e.type == EventType.MouseUp && e.button == 0) {
+		if(e.type == EventType.MouseUp && e.button == 0 && mouseDragging) {
 			mouseDragging = false;
-			UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition));
+			UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition), e.modifiers == EventModifiers.Shift);
 		}
 
-		// SCale
+		// Scale
 		if(e.type == EventType.ScrollWheel)
 		{
 			float modifier = -1f;
@@ -183,9 +194,6 @@ public class UVeeWindow : EditorWindow {
 
 		DrawGraphBase();
 
-		for(int i = 0; i < selection.Length; i++)
-			DrawPoints( user_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
-
 		if(drawTriangles)
 			for(int i = 0; i < selected_triangles.Length; i++)
 				DrawLines(triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
@@ -194,52 +202,16 @@ public class UVeeWindow : EditorWindow {
 			for(int i = 0; i < selection.Length; i++)
 				DrawBoundingBox(user_points[i]);
 
+		for(int i = 0; i < selection.Length; i++)
+			DrawPoints( user_points[i] );//, COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+
+
 		//** Draw Preferences Pane **//
-		{
-			settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
-			settingsMaxWidth = (int)settingsBoxRect.width-settingsBoxPad*2;
-
-			GUI.Box(settingsBoxRect, "");
-			GUI.BeginGroup(settingsBoxRect);
-
-			GUILayout.BeginHorizontal();
-				showPreferences = EditorGUILayout.Foldout(showPreferences, "Preferences");
-			GUILayout.EndHorizontal();
-				if(showPreferences)
-				{
-					settingsBoxHeight = expandedSettingsHeight;
-					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(settingsMaxWidth));
-					uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
-					
-					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
-					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
-
-					GUI.changed = false;
-					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(settingsMaxWidth));
-					if(GUI.changed) OnSelectionChange();
-
-					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(settingsMaxWidth));
-					
-					string[] submeshes = new string[selection[0].sharedMesh.subMeshCount+1];
-					submeshes[0] = "All";
-					for(int i = 1; i < submeshes.Length; i++)
-						submeshes[i] = (i-1).ToString();
-
-					submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes);
-
-					// GUI.changed = false;
-					// DRAG_BOX_COLOR = EditorGUILayout.ColorField(DRAG_BOX_COLOR);
-					// if(GUI.changed)
-					// 	Debug.Log(DRAG_BOX_COLOR);
-
-				}
-				else
-					settingsBoxHeight = compactSettingsHeight;
-			GUI.EndGroup();
-		}
+		DrawPreferencesPane();
 
 		// move tools	
-		GUI.DrawTexture(new Rect(uv_center.x - moveTool.width/2, uv_center.y - moveTool.height/2, moveTool.width, moveTool.height), moveTool);
+		// GUI.DrawTexture(new Rect(uv_center.x - moveTool.width/2, uv_center.y - moveTool.height/2, moveTool.width, moveTool.height), moveTool);
+		GUI.DrawTexture(moveToolRect, moveTool, ScaleMode.ScaleToFit, true, 0);
 
 		if(mouseDragging) {
 			if(Vector2.Distance(drag_start, e.mousePosition) > 10)
@@ -276,23 +248,46 @@ public class UVeeWindow : EditorWindow {
 		UpdateGUIPointCache();
 	}
 
-	public void UpdateSelectionWithGUIRect(Rect rect)
+	public void UpdateSelectionWithGUIRect(Rect rect, bool shift)
 	{
 
 		bool pointSelected = false;
-		for(int i = 0; i < selection.Length; i++)
+		// avoid if checks if shift isn't held - (this loop is already slow, so take speed improvements where we can)
+		if(!shift)
 		{
-			selected_triangles[i].Clear();
-			
-			for(int n = 0; n < selection[i].sharedMesh.triangles.Length; n++)
+			float start = (float)EditorApplication.timeSinceStartup;
+
+			for(int i = 0; i < selection.Length; i++)
 			{
-				if(rect.Contains(uv_points[i][selection[i].sharedMesh.triangles[n]]))
+				selected_triangles[i].Clear();
+				int[] tris = selection[i].sharedMesh.triangles;
+				for(int n = 0; n < tris.Length; n++)
 				{
-					pointSelected = true;
-					selected_triangles[i].Add( selection[i].sharedMesh.triangles[n] );
+					if(rect.Contains(uv_points[i][tris[n]]))
+					{
+						pointSelected = true;
+						selected_triangles[i].Add( tris[n] );
+					}
 				}
 			}
+			LogMethodTime("UpdateSelectionWithGUIRect", (float)EditorApplication.timeSinceStartup - start);
 		}
+		else
+		{
+			for(int i = 0; i < selection.Length; i++)
+			{
+				selected_triangles[i].Clear();
+				int[] tris = selection[i].sharedMesh.triangles;
+				for(int n = 0; n < tris.Length; n++)
+				{
+					if(rect.Contains(uv_points[i][tris[n]]))
+					{
+						pointSelected = true;
+						selected_triangles[i].Add( tris[n] );
+					}
+				}
+			}
+		}	
 		if(!pointSelected)
 			OnSelectionChange();
 
@@ -306,7 +301,10 @@ public class UVeeWindow : EditorWindow {
 		uv_points = new Vector2[selection.Length][];
 		user_points = new Vector2[selection.Length][];
 		triangle_points = new Vector2[selection.Length][];
+		// user_triangle_points = new Vector2[selection.Length][];
 		all_points = new List<Vector2>();
+
+		LogStart("UpdateGUIPointCache");
 
 		for(int i = 0; i < selection.Length; i++)
 		{
@@ -314,23 +312,33 @@ public class UVeeWindow : EditorWindow {
 			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], selected_triangles[i]));
 			all_points.AddRange(user_points[i]);
 
+			int[] tris = selection[i].sharedMesh.triangles;
 			List<Vector2> lines = new List<Vector2>();
-			for(int n = 0; n < selection[i].sharedMesh.triangles.Length; n+=3)
+			List<Vector2> u_lines = new List<Vector2>();
+			for(int n = 0; n < tris.Length; n+=3)
 			{
-				Vector3 p0 = uv_points[i][selection[i].sharedMesh.triangles[n+0]];
-				Vector3 p1 = uv_points[i][selection[i].sharedMesh.triangles[n+1]];
-				Vector3 p2 = uv_points[i][selection[i].sharedMesh.triangles[n+2]];
+				Vector2 p0 = uv_points[i][tris[n+0]];
+				Vector2 p1 = uv_points[i][tris[n+1]];
+				Vector2 p2 = uv_points[i][tris[n+2]];
 
-				bool p0_s = selected_triangles[i].Contains(selection[i].sharedMesh.triangles[n+0]);
-				bool p1_s = selected_triangles[i].Contains(selection[i].sharedMesh.triangles[n+1]);
-				bool p2_s = selected_triangles[i].Contains(selection[i].sharedMesh.triangles[n+2]);
+				/**
+				 *	This code creates a triangle line array containing tris only for selected points.  Useful, but
+				 *	suuuper slow.
+				 */
+				// bool p0_s = selected_triangles[i].Contains(tris[n+0]);
+				// bool p1_s = selected_triangles[i].Contains(tris[n+1]);
+				// bool p2_s = selected_triangles[i].Contains(tris[n+2]);
 
-				if(p0_s && p1_s) { lines.Add(p0); lines.Add(p1); }
-				if(p1_s && p2_s) { lines.Add(p1); lines.Add(p2); }
-				if(p0_s && p2_s) { lines.Add(p2); lines.Add(p0); }
+				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
+				// if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
+				// if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
+				// if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
 			}
 			triangle_points[i] = lines.ToArray();
+			// user_triangle_points[i] = u_lines.ToArray();
 		}
+
+		LogFinish("UpdateGUIPointCache");
 
 		uv_center = Average(all_points);
 	}
@@ -419,6 +427,44 @@ public class UVeeWindow : EditorWindow {
 		GUI.color = new Color(.2f, .2f, .2f, .2f);
 			GUI.Box(GUIRectWithPoints( min, max), "");
 		GUI.color = Color.white;
+	}
+
+	public void DrawPreferencesPane()
+	{
+		settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
+		settingsMaxWidth = (int)settingsBoxRect.width-settingsBoxPad*2;
+
+		GUI.Box(settingsBoxRect, "");
+		GUI.BeginGroup(settingsBoxRect);
+
+		GUILayout.BeginHorizontal();
+			showPreferences = EditorGUILayout.Foldout(showPreferences, "Preferences");
+		GUILayout.EndHorizontal();
+			if(showPreferences)
+			{
+				settingsBoxHeight = expandedSettingsHeight;
+				workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(settingsMaxWidth));
+				uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
+				
+				showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
+				drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
+
+				GUI.changed = false;
+				showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(settingsMaxWidth));
+				if(GUI.changed) OnSelectionChange();
+
+				drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(settingsMaxWidth));
+				
+				string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
+				submeshes[0] = "All";
+				for(int i = 1; i < submeshes.Length; i++)
+					submeshes[i] = (i-1).ToString();
+
+				submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes);
+			}
+			else
+				settingsBoxHeight = compactSettingsHeight;
+		GUI.EndGroup();
 	}
 #endregion
 
@@ -545,6 +591,20 @@ public class UVeeWindow : EditorWindow {
 			methodExecutionTimes[methodName].Add(time);
 		else
 			methodExecutionTimes.Add(methodName, new List<float>(new float[1]{time}));
+	}
+
+	Dictionary<string, float> timer = new Dictionary<string, float>();
+	public void LogStart(string methodName)
+	{
+		if(methodExecutionTimes.ContainsKey(methodName))
+			timer[methodName] = (float)EditorApplication.timeSinceStartup;
+		else
+			timer.Add(methodName, (float)EditorApplication.timeSinceStartup);
+	}
+
+	public void LogFinish(string methodName)
+	{
+		LogMethodTime(methodName, (float)EditorApplication.timeSinceStartup - timer[methodName]);
 	}
 
 	public void OnDisable()
