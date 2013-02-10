@@ -24,13 +24,14 @@ public class UVeeWindow : EditorWindow {
 	bool showTex = true;
 	bool drawBoundingBox = false;
 	bool drawTriangles = true;
+	// bool drawNonSelectedPoints = true;
 #endregion
 
 #region DATA
 
 	MeshFilter[] selection = new MeshFilter[0];
-	int submesh = -1;
-	List<int>[] selected_triangles = new List<int>[0];
+	int submesh = 0;
+	HashSet<int>[] selected_triangles = new HashSet<int>[0];
 	Texture2D tex;
 
 	// GUI draw caches
@@ -51,7 +52,7 @@ public class UVeeWindow : EditorWindow {
 
 	Color[] COLOR_ARRAY = new Color[5];
 
-	Color DRAG_BOX_COLOR = new Color(0f, 0f, .6f, .3f);
+	Color DRAG_BOX_COLOR = new Color(.6f, .6f, .6f, .45f);
 #endregion
 
 #region GUI MEMBERS
@@ -68,7 +69,7 @@ public class UVeeWindow : EditorWindow {
 
 	float scale = 0f;
 
-	int expandedSettingsHeight = 160;
+	int expandedSettingsHeight = 180;
 	int compactSettingsHeight = 50;
 	int settingsBoxHeight;
 
@@ -79,6 +80,8 @@ public class UVeeWindow : EditorWindow {
 	Vector2 offset = new Vector2(0f, 0f);
 	Vector2 start = new Vector2(0f, 0f);
 	bool dragging = false;
+
+	bool scrolling = false;
 #endregion
 
 #region INITIALIZATION
@@ -94,11 +97,12 @@ public class UVeeWindow : EditorWindow {
 		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
 		PopulateColorArray();
 		OnSelectionChange();
+		Repaint();
 	}
 #endregion
 
 #region UPDATE
-
+	
 	// force update window
 	void OnInspectorUpdate()
 	{
@@ -113,7 +117,7 @@ public class UVeeWindow : EditorWindow {
 		//** Handle events **//
 
 		Event e = Event.current;
-		if(e.isMouse)
+		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition))
 		{
 			if(e.button == 2 || (e.modifiers == EventModifiers.Alt && e.button == 0))
 			{
@@ -140,16 +144,15 @@ public class UVeeWindow : EditorWindow {
 			}
 
 			// USER INPUT THAT CAN BE DRAWN
-			if(e.type == EventType.MouseDown && e.button == 0 && !settingsBoxRect.Contains(e.mousePosition) && e.modifiers != EventModifiers.Alt) {
+			if(e.type == EventType.MouseDown && e.button == 0 && e.modifiers != EventModifiers.Alt) {
 				drag_start = e.mousePosition;
 				mouseDragging = true;
 			}
+		}
 
-			if(e.type == EventType.MouseUp && e.button == 0) {
-				mouseDragging = false;
-				UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition));
-			}
-
+		if(e.type == EventType.MouseUp && e.button == 0) {
+			mouseDragging = false;
+			UpdateSelectionWithGUIRect(GUIRectWithPoints(drag_start, e.mousePosition));
 		}
 
 		// SCale
@@ -158,11 +161,19 @@ public class UVeeWindow : EditorWindow {
 			float modifier = -1f;
 			workspace_scale = (int)Mathf.Clamp(workspace_scale + (e.delta.y * modifier), MIN_ZOOM, MAX_ZOOM);
 			Repaint();
+			scrolling = true;
 		}
 
 		if(e.isKey && e.keyCode == KeyCode.Alpha0) {
 			offset = Vector2.zero;
 			workspace_scale = 100;
+			Repaint();
+			UpdateGUIPointCache();
+		}
+
+		if(e.type == EventType.MouseUp)
+		{
+			UpdateGUIPointCache();
 			Repaint();
 		}
 
@@ -177,7 +188,7 @@ public class UVeeWindow : EditorWindow {
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
-				DrawBoundingBox(((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2));
+				DrawBoundingBox(user_points[i]);
 
 		//** Draw Preferences Pane **//
 		{
@@ -210,7 +221,13 @@ public class UVeeWindow : EditorWindow {
 					for(int i = 1; i < submeshes.Length; i++)
 						submeshes[i] = (i-1).ToString();
 
-					submesh = EditorGUILayout.Popup(submesh, submeshes);
+					submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes);
+
+					// GUI.changed = false;
+					// DRAG_BOX_COLOR = EditorGUILayout.ColorField(DRAG_BOX_COLOR);
+					// if(GUI.changed)
+					// 	Debug.Log(DRAG_BOX_COLOR);
+
 				}
 				else
 					settingsBoxHeight = compactSettingsHeight;
@@ -218,7 +235,14 @@ public class UVeeWindow : EditorWindow {
 		}
 
 		if(mouseDragging) {
-			DrawBox(drag_start, e.mousePosition, DRAG_BOX_COLOR);
+			if(Vector2.Distance(drag_start, e.mousePosition) > 10)
+				DrawBox(drag_start, e.mousePosition, DRAG_BOX_COLOR);
+			Repaint();
+		}
+
+		if(scrolling) {
+			scrolling = false;
+			UpdateGUIPointCache();
 			Repaint();
 		}
 	}
@@ -229,10 +253,10 @@ public class UVeeWindow : EditorWindow {
 	public void OnSelectionChange()
 	{
 		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
-		selected_triangles = new List<int>[selection.Length];
+		selected_triangles = new HashSet<int>[selection.Length];
 
 		for(int i = 0; i < selection.Length; i++)
-			selected_triangles[i] = new List<int>(selection[i].sharedMesh.triangles);
+			selected_triangles[i] = new HashSet<int>(selection[i].sharedMesh.triangles);
 
 		if(selection != null && selection.Length > 0)
 			tex = (Texture2D)selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
@@ -242,14 +266,17 @@ public class UVeeWindow : EditorWindow {
 
 	public void UpdateSelectionWithGUIRect(Rect rect)
 	{
+#if DEBUG
+		float start = (float)EditorApplication.timeSinceStartup;
+#endif			
 		bool pointSelected = false;
 		for(int i = 0; i < selection.Length; i++)
 		{
 			selected_triangles[i].Clear();
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			
 			for(int n = 0; n < selection[i].sharedMesh.triangles.Length; n++)
 			{
-				if(rect.Contains(UVToGUIPoint( uvs[selection[i].sharedMesh.triangles[n]])))
+				if(rect.Contains(uv_points[i][selection[i].sharedMesh.triangles[n]]))
 				{
 					pointSelected = true;
 					selected_triangles[i].Add( selection[i].sharedMesh.triangles[n] );
@@ -258,13 +285,18 @@ public class UVeeWindow : EditorWindow {
 		}
 		if(!pointSelected)
 			OnSelectionChange();
-		
+#if DEBUG
+		LogMethodTime("UpdateSelectionWithGUIRect", (float)EditorApplication.timeSinceStartup - start);
+#endif		
 		UpdateGUIPointCache();
 	}
 
 	// Call after UVs are selected, or the GUI space has been modified
 	public void UpdateGUIPointCache()
 	{	
+#if DEBUG
+		float start = (float)EditorApplication.timeSinceStartup;
+#endif		
 		uv_points = new Vector2[selection.Length][];
 		user_points = new Vector2[selection.Length][];
 		triangle_points = new Vector2[selection.Length][];
@@ -291,6 +323,9 @@ public class UVeeWindow : EditorWindow {
 			}
 			triangle_points[i] = lines.ToArray();
 		}
+#if DEBUG
+		LogMethodTime("UpdateGUIPointCache", (float)EditorApplication.timeSinceStartup - start);
+#endif
 	}
 #endregion
 
@@ -374,62 +409,6 @@ public class UVeeWindow : EditorWindow {
 		Handles.EndGUI();
 	}
 
-	// this is suuuper slow
-// 	public void DrawTriangles(MeshFilter[] mfs, List<int>[] selected)
-// 	{
-// #if DEBUG
-// 		float start = (float)EditorApplication.timeSinceStartup;
-// #endif
-// 		Handles.BeginGUI();
-// 		Handles.color = Color.black;
-
-// 		// doesn't support any different winding types yet
-// 		for(int i = 0; i < mfs.Length; i++)
-// 		{
-// 			Vector2[] uv = (uvChannel == UVChannel.UV) ? mfs[i].sharedMesh.uv : mfs[i].sharedMesh.uv2;
-// 			List<int> tri = selected[i];
-
-// 			for(int n = 0; n < mfs[i].sharedMesh.triangles.Length; n+=3)
-// 			{
-// #if DEBUG
-// 				float uvguipointstart = (float)EditorApplication.timeSinceStartup;
-// #endif
-// 				Vector3 p0 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+0]]);
-// 				Vector3 p1 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+1]]);
-// 				Vector3 p2 = UVToGUIPoint(uv[mfs[i].sharedMesh.triangles[n+2]]);
-// #if DEBUG
-// 				LogMethodTime("UVToGUIPoint Conversion", (float)EditorApplication.timeSinceStartup - uvguipointstart);
-// #endif
-
-// #if DEBUG
-// 				float tristart = (float)EditorApplication.timeSinceStartup;
-// #endif
-// 				bool p1_s = tri.Contains(mfs[i].sharedMesh.triangles[n+1]);
-// 				bool p0_s = tri.Contains(mfs[i].sharedMesh.triangles[n+0]);
-// 				bool p2_s = tri.Contains(mfs[i].sharedMesh.triangles[n+2]);
-// #if DEBUG
-// 				LogMethodTime("Tri Contains", (float)EditorApplication.timeSinceStartup - tristart);
-// #endif
-
-// #if DEBUG
-// 				float handlesatrt = (float)EditorApplication.timeSinceStartup;
-// #endif
-// 				if(p0_s && p1_s) Handles.DrawLine(p0, p1);
-// 				if(p1_s && p2_s) Handles.DrawLine(p1, p2);
-// 				if(p0_s && p2_s) Handles.DrawLine(p2, p0);
-// #if DEBUG
-// 				LogMethodTime("Draw Triangle Handles", (float)EditorApplication.timeSinceStartup - handlesatrt);
-// #endif
-// 			}
-// 		}
-// 
-// 		Handles.color = Color.white;
-// 		Handles.EndGUI();
-// #if DEBUG
-// 		LogMethodTime("DrawTriangles", (float)EditorApplication.timeSinceStartup - start);
-// #endif
-// 	}
-
 	public void DrawBoundingBox(Vector2[] points)
 	{
 		Vector2 min = Vector2ArrayMin(points);
@@ -460,17 +439,18 @@ public class UVeeWindow : EditorWindow {
 		COLOR_ARRAY[4] = Color.magenta;
 	}
 
-	public Vector2[] UVArrayWithTriangles(MeshFilter mf, List<int> tris)
+	public Vector2[] UVArrayWithTriangles(MeshFilter mf, HashSet<int> tris)
 	{
 		List<Vector2> uvs = new List<Vector2>();
 
 		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
-		for(int n = 0; n < tris.Count; n++)
-		{
-			// Debug.Log("N INDEX: " + n + "  n value: " + tris[n] + " / " + tris.Count);
-			uvs.Add( mf_uv[tris[n]] );
-		}
-
+		// for(int n = 0; n < tris.Count; n++)
+		// {
+		// 	// Debug.Log("N INDEX: " + n + "  n value: " + tris[n] + " / " + tris.Count);
+		// 	uvs.Add( mf_uv[tris[n]] );
+		// }
+		foreach(int tri in tris)
+			uvs.Add(mf_uv[tri]);
 		return uvs.ToArray();
 	}
 
@@ -541,6 +521,15 @@ public class UVeeWindow : EditorWindow {
 		u += center;
 		// u -= new Vector2(buttonSize/2f, buttonSize/2f);
 		u = new Vector2(Mathf.Round(u.x), Mathf.Round(u.y));
+		return u;
+	}
+
+	public Vector2 GUIToUVPoint(Vector2 gui)
+	{
+		gui -= center;
+		gui /= scale;
+		Vector2 u = new Vector2(gui.x, -gui.y);
+
 		return u;
 	}
 #endregion
