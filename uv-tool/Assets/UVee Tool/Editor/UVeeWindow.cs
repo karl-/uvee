@@ -254,17 +254,20 @@ public class UVeeWindow : EditorWindow {
 		selected_triangles = new HashSet<int>[selection.Length];
 
 		for(int i = 0; i < selection.Length; i++)
-			selected_triangles[i] = new HashSet<int>(/*selection[i].sharedMesh.triangles*/);
+			selected_triangles[i] = new HashSet<int>();
 
 		if(selection != null && selection.Length > 0)
-			tex = (Texture2D)selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
+		{
+			// ??
+			Object t = selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
+			tex = (t == null) ? null : (Texture2D)t;
+		}
 		
 		UpdateGUIPointCache();
 	}
 
 	public void UpdateSelectionWithGUIRect(Rect rect, bool shift)
 	{
-
 		bool pointSelected = false;
 		// avoid if checks if shift isn't held - (this loop is already slow, so take speed improvements where we can)
 		if(!shift)
@@ -347,7 +350,7 @@ public class UVeeWindow : EditorWindow {
 
 			triangle_points[i] = lines.ToArray();
 			user_triangle_points[i] = u_lines.ToArray();
-			distinct_triangle_selection[i] = selected_triangles[i].ToArray()/*.Distinct().ToArray()*/;
+			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
 		}
 
 		uv_center = Average(all_points);
@@ -491,6 +494,12 @@ public class UVeeWindow : EditorWindow {
 		{
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
+			Undo.SetSnapshotTarget(TransformExtensions.GetMeshes(Selection.transforms) as Object[], "Move UVs");
+			// Undo.RegisterSceneUndo("Move UVs");
+			for(int i = 0; i < Selection.transforms.Length; i++)
+				EditorUtility.SetDirty(Selection.transforms[i]);
+			Undo.CreateSnapshot();
+			Undo.RegisterSnapshot();
 		}
 
 		if(dragging_uv)
@@ -505,7 +514,6 @@ public class UVeeWindow : EditorWindow {
 
 		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
 		{
-			Debug.Log("uh oh: " + e.type);
 			dragging_uv = false;
 			UpdateGUIPointCache();
 		}
@@ -705,6 +713,15 @@ public static class TransformExtensions
 			c.AddRange(t.GetComponentsInChildren<T>());
 		}
 		return c.ToArray() as T[];
+	}
+
+	public static Mesh[] GetMeshes(Transform[] t_arr)
+	{
+		MeshFilter[] mfs = GetComponents<MeshFilter>(t_arr);
+		Mesh[] m = new Mesh[mfs.Length];
+		for(int i = 0; i < mfs.Length; i++)
+			m[i] = mfs[i].sharedMesh;
+		return m;
 	}
 
 	public static GameObject[] GetGameObjectsWithComponent<T>(Transform[] t_arr) where T : Component
