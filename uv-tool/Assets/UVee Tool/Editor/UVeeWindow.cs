@@ -49,8 +49,8 @@ public class UVeeWindow : EditorWindow {
 
 #region CONSTANT
 
-	const int MIN_ZOOM = 25;
-	const int MAX_ZOOM = 800;
+	const int MIN_ZOOM = 1;
+	const int MAX_ZOOM = 1000;
 
 	const int LINE_WIDTH = 1;
 	Color LINE_COLOR = Color.gray;
@@ -272,6 +272,34 @@ public class UVeeWindow : EditorWindow {
 			UndoPerformed();
 			Repaint();
 		}
+
+		if(SceneView.onSceneGUIDelegate != this.OnSceneGUI)
+		{
+			SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
+			SceneView.onSceneGUIDelegate += this.OnSceneGUI;
+   		}
+	}
+#endregion
+
+#region ONSCENEGUI
+
+	public void OnSceneGUI(SceneView sceneView)
+	{
+		for(int i = 0; i < selected_triangles.Length; i++)
+		{
+			Vector3[] v = TransformExtensions.VerticesInWorldSpace(selection[i]);
+			int[] tris 	= selected_triangles[i].ToArray();
+
+			Handles.color = COLOR_ARRAY[i%COLOR_ARRAY.Length];
+			for(int n = 0; n < tris.Length; n++)
+			{
+				Handles.DotCap(0,
+					v[tris[n]],
+					Quaternion.identity,
+					.2f);
+			}
+			Handles.color = Color.white;
+		}
 	}
 #endregion
 
@@ -407,6 +435,8 @@ public class UVeeWindow : EditorWindow {
 		}
 
 		uv_center = Average(all_points);
+
+		SceneView.RepaintAll();
 
 		LogFinish("UpdateGUIPointCache");
 	}
@@ -810,6 +840,14 @@ public class UVeeWindow : EditorWindow {
 				str += arr[i].ToString() + seperator;
 			str += arr[arr.Length-1];
 			return str;
+		}
+
+		public static Vector3[] VerticesInWorldSpace(MeshFilter mf)
+		{
+			Vector3[] v = mf.sharedMesh.vertices;
+			for(int i = 0; i < v.Length; i++)
+				v[i] = mf.transform.TransformPoint(v[i]);
+			return v;
 		}
 	}
 #endregion
