@@ -347,7 +347,7 @@ public class UVeeWindow : EditorWindow {
 
 			triangle_points[i] = lines.ToArray();
 			user_triangle_points[i] = u_lines.ToArray();
-			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
+			distinct_triangle_selection[i] = selected_triangles[i].ToArray()/*.Distinct().ToArray()*/;
 		}
 
 		uv_center = Average(all_points);
@@ -505,6 +505,7 @@ public class UVeeWindow : EditorWindow {
 
 		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
 		{
+			Debug.Log("uh oh: " + e.type);
 			dragging_uv = false;
 			UpdateGUIPointCache();
 		}
@@ -518,7 +519,7 @@ public class UVeeWindow : EditorWindow {
 		for(int i = 0; i < selection.Length; i++)
 		{
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
-			for(int n = 0; n < uv_selection.Length; n++)
+			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
 				uvs[uv_selection[i][n]] -= uvDelta;
 			}
