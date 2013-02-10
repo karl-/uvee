@@ -174,7 +174,7 @@ public class UVeeWindow : EditorWindow {
 		}
 
 		// dragging uvs around
-		if(e.isMouse && e.button == 0 && e.modifiers == (EventModifiers)0 && !settingsBoxRect.Contains(e.mousePosition) && moveToolRect.Contains(e.mousePosition))
+		if(e.isMouse && e.button == 0 && e.modifiers == (EventModifiers)0 && !settingsBoxRect.Contains(e.mousePosition))
 			UVMoveTool();
 
 		if(e.type == EventType.MouseUp && e.button == 0 && mouseDragging) {
@@ -420,7 +420,7 @@ public class UVeeWindow : EditorWindow {
 			GUI.color = Color.white;
 
 			if(showCoordinates)
-				GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + GUIToUVPoint(guiPoint) );
+				GUI.Label(new Rect(guiPoint.x, guiPoint.y, 100, 40), "" + GUIToUVPoint(guiPoint).ToString("F3") );
 		}
 	}
 
@@ -508,7 +508,7 @@ public class UVeeWindow : EditorWindow {
 	public void UVMoveTool()
 	{
 		Event e = Event.current;
-		if(e.type == EventType.MouseDown) 
+		if(e.type == EventType.MouseDown && moveToolRect.Contains(e.mousePosition)) 
 		{
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
@@ -534,7 +534,7 @@ public class UVeeWindow : EditorWindow {
 			Repaint();
 		}
 
-		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
+		if((e.type == EventType.MouseUp || e.type == EventType.Ignore) && dragging_uv)
 		{
 			dragging_uv = false;
 			UpdateGUIPointCache();
