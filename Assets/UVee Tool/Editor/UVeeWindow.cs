@@ -38,7 +38,7 @@ public class UVeeWindow : EditorWindow {
 	Vector2[][] 	uv_points 		= new Vector2[0][];	// all uv points
 	Vector2[][] 	user_points 	= new Vector2[0][];
 	Vector2[][]		triangle_points = new Vector2[0][];	// wound in twos - so a triangle is { p0, p1, p1, p1, p2, p0 }
-	// Vector2[][]		user_triangle_points = new Vector2[0][];	// contains only selected triangles
+	Vector2[][]		user_triangle_points = new Vector2[0][];	// contains only selected triangles
 	List<Vector2>	all_points 		= new List<Vector2>();
 	Vector2 		uv_center 		= Vector2.zero;
 #endregion
@@ -196,7 +196,11 @@ public class UVeeWindow : EditorWindow {
 
 		if(drawTriangles)
 			for(int i = 0; i < selected_triangles.Length; i++)
-				DrawLines(triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+				DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+
+		if(drawTriangles)
+			for(int i = 0; i < selected_triangles.Length; i++)
+				DrawLines(triangle_points[i], new Color(.2f, .2f, .2f, .2f));
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
@@ -219,6 +223,9 @@ public class UVeeWindow : EditorWindow {
 			Repaint();
 		}
 
+		if(dragging)	
+			UpdateGUIPointCache();
+
 		if(scrolling) {
 			scrolling = false;
 			UpdateGUIPointCache();
@@ -240,7 +247,7 @@ public class UVeeWindow : EditorWindow {
 		selected_triangles = new HashSet<int>[selection.Length];
 
 		for(int i = 0; i < selection.Length; i++)
-			selected_triangles[i] = new HashSet<int>(selection[i].sharedMesh.triangles);
+			selected_triangles[i] = new HashSet<int>(/*selection[i].sharedMesh.triangles*/);
 
 		if(selection != null && selection.Length > 0)
 			tex = (Texture2D)selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
@@ -287,7 +294,8 @@ public class UVeeWindow : EditorWindow {
 					}
 				}
 			}
-		}	
+		}
+
 		if(!pointSelected)
 			OnSelectionChange();
 
@@ -301,7 +309,7 @@ public class UVeeWindow : EditorWindow {
 		uv_points = new Vector2[selection.Length][];
 		user_points = new Vector2[selection.Length][];
 		triangle_points = new Vector2[selection.Length][];
-		// user_triangle_points = new Vector2[selection.Length][];
+		user_triangle_points = new Vector2[selection.Length][];
 		all_points = new List<Vector2>();
 
 		LogStart("UpdateGUIPointCache");
@@ -325,17 +333,17 @@ public class UVeeWindow : EditorWindow {
 				 *	This code creates a triangle line array containing tris only for selected points.  Useful, but
 				 *	suuuper slow.
 				 */
-				// bool p0_s = selected_triangles[i].Contains(tris[n+0]);
-				// bool p1_s = selected_triangles[i].Contains(tris[n+1]);
-				// bool p2_s = selected_triangles[i].Contains(tris[n+2]);
+				bool p0_s = selected_triangles[i].Contains(tris[n+0]);
+				bool p1_s = selected_triangles[i].Contains(tris[n+1]);
+				bool p2_s = selected_triangles[i].Contains(tris[n+2]);
 
 				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
-				// if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
-				// if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
-				// if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
+				if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
+				if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
+				if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
 			}
 			triangle_points[i] = lines.ToArray();
-			// user_triangle_points[i] = u_lines.ToArray();
+			user_triangle_points[i] = u_lines.ToArray();
 		}
 
 		LogFinish("UpdateGUIPointCache");
@@ -492,11 +500,7 @@ public class UVeeWindow : EditorWindow {
 		List<Vector2> uvs = new List<Vector2>();
 
 		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
-		// for(int n = 0; n < tris.Count; n++)
-		// {
-		// 	// Debug.Log("N INDEX: " + n + "  n value: " + tris[n] + " / " + tris.Count);
-		// 	uvs.Add( mf_uv[tris[n]] );
-		// }
+
 		foreach(int tri in tris)
 			uvs.Add(mf_uv[tri]);
 		return uvs.ToArray();
