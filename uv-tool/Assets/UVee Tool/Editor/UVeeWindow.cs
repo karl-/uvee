@@ -31,7 +31,7 @@ public class UVeeWindow : EditorWindow {
 
 	MeshFilter[] selection = new MeshFilter[0];
 	int submesh = 0;
-	HashSet<int>[] selected_triangles = new HashSet<int>[0];
+	List<int>[] selected_triangles = new List<int>[0];
 	Texture2D tex;
 
 	// GUI draw caches
@@ -44,6 +44,7 @@ public class UVeeWindow : EditorWindow {
 
 	// selection caches
 	int[][]			distinct_triangle_selection = new int[0][];	///< Guarantees that only one index per vertex is present
+	Mesh[]			lastMeshUndoCache = new Mesh[0]{};
 #endregion
 
 #region CONSTANT
@@ -75,6 +76,7 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
+	Color MOVE_TOOL_COLOR = new Color(.116f, .116f, .116f, 1f);
 
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
@@ -226,8 +228,9 @@ public class UVeeWindow : EditorWindow {
 		DrawPreferencesPane();
 
 		// move tools	
-		// GUI.DrawTexture(new Rect(uv_center.x - moveTool.width/2, uv_center.y - moveTool.height/2, moveTool.width, moveTool.height), moveTool);
-		GUI.DrawTexture(moveToolRect, moveTool, ScaleMode.ScaleToFit, true, 0);
+		GUI.color = MOVE_TOOL_COLOR;
+			GUI.DrawTexture(moveToolRect, moveTool, ScaleMode.ScaleToFit, true, 0);
+		GUI.color = Color.white;
 
 		if(mouseDragging) {
 			if(Vector2.Distance(drag_start, e.mousePosition) > 10)
@@ -245,13 +248,26 @@ public class UVeeWindow : EditorWindow {
 		}
 
 		if(UndoRedoPerformed) {
-			UpdateGUIPointCache();
+			UndoPerformed();
 			Repaint();
 		}
 	}
 #endregion
 
 #region EVENT
+			
+	/**
+	 *	\brief Force update the mesh with old UVs.
+	 */
+	public void UndoPerformed()
+	{
+		UpdateGUIPointCache();
+		foreach(Mesh m in lastMeshUndoCache)
+		{
+			m.uv = m.uv;
+			m.uv2 = m.uv2;
+		}
+	}
 
 	public void OnFocus()
 	{
@@ -261,10 +277,10 @@ public class UVeeWindow : EditorWindow {
 	public void OnSelectionChange()
 	{
 		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
-		selected_triangles = new HashSet<int>[selection.Length];
+		selected_triangles = new List<int>[selection.Length];
 
 		for(int i = 0; i < selection.Length; i++)
-			selected_triangles[i] = new HashSet<int>();
+			selected_triangles[i] = new List<int>();
 
 		if(selection != null && selection.Length > 0)
 		{
@@ -300,14 +316,19 @@ public class UVeeWindow : EditorWindow {
 		{
 			for(int i = 0; i < selection.Length; i++)
 			{
-				selected_triangles[i].Clear();
+				// selected_triangles[i].Clear();
 				int[] tris = selection[i].sharedMesh.triangles;
+
 				for(int n = 0; n < tris.Length; n++)
 				{
 					if(rect.Contains(uv_points[i][tris[n]]))
 					{
 						pointSelected = true;
-						selected_triangles[i].Add( tris[n] );
+
+						if(distinct_triangle_selection[i].Contains(tris[n]))
+							selected_triangles[i].Remove(tris[n]);
+						else
+							selected_triangles[i].Add( tris[n] );
 					}
 				}
 			}
@@ -473,12 +494,7 @@ public class UVeeWindow : EditorWindow {
 				
 				GUI.changed = false;
 				uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
-				// if(GUI.changed)
-				// 	if(ChannelIsNull(uvChannel))
-				// 	{
-				// 		Debug.LogWarning("UV Channel not foound.");
-				// 		uvChannel = (int)uvChannel++/2;
-				// 	}
+
 				showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
 				drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
 
@@ -493,7 +509,7 @@ public class UVeeWindow : EditorWindow {
 				for(int i = 1; i < submeshes.Length; i++)
 					submeshes[i] = (i-1).ToString();
 
-				submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes);
+				submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(settingsMaxWidth));
 			}
 			else
 				settingsBoxHeight = compactSettingsHeight;
@@ -512,8 +528,9 @@ public class UVeeWindow : EditorWindow {
 		{
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
-			Undo.SetSnapshotTarget(TransformExtensions.GetMeshes(Selection.transforms) as Object[], "Move UVs");
-			// Undo.RegisterSceneUndo("Move UVs");
+			lastMeshUndoCache = TransformExtensions.GetMeshes(Selection.transforms);
+			Undo.SetSnapshotTarget(lastMeshUndoCache as Object[], "Move UVs");
+
 			for(int i = 0; i < Selection.transforms.Length; i++)
 				EditorUtility.SetDirty(Selection.transforms[i]);
 			Undo.CreateSnapshot();
@@ -525,7 +542,7 @@ public class UVeeWindow : EditorWindow {
 			Vector2 delta = GUIToUVPoint(dragging_uv_start) - GUIToUVPoint(e.mousePosition);
 
 			// because gui is called 2x?
-			delta /= 2f;
+			// delta /= 2f;
 
 			dragging_uv_start = e.mousePosition;
 			TranslateUVs(distinct_triangle_selection, delta);
@@ -547,7 +564,7 @@ public class UVeeWindow : EditorWindow {
 	public void TranslateUVs(int[][] uv_selection, Vector2 uvDelta)
 	{
 		Vector2 d = uvDelta;
-		// Debug.Log(uvDelta.ToString("F7"));
+
 		for(int i = 0; i < selection.Length; i++)
 		{
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
@@ -727,49 +744,51 @@ public class UVeeWindow : EditorWindow {
 #endregion
 }
 
-public static class TransformExtensions
-{
-	public static T[] GetComponents<T>(Transform[] t_arr) where T : Component
+#region EXTENSION
+	public static class TransformExtensions
 	{
-		List<T> c = new List<T>();
-		foreach(Transform t in t_arr)
+		public static T[] GetComponents<T>(Transform[] t_arr) where T : Component
 		{
-			if(t.GetComponent<T>())	
-				c.Add(t.GetComponent<T>());
-			c.AddRange(t.GetComponentsInChildren<T>());
+			List<T> c = new List<T>();
+			foreach(Transform t in t_arr)
+			{
+				if(t.GetComponent<T>())	
+					c.Add(t.GetComponent<T>());
+				c.AddRange(t.GetComponentsInChildren<T>());
+			}
+			return c.ToArray() as T[];
 		}
-		return c.ToArray() as T[];
-	}
 
-	public static Mesh[] GetMeshes(Transform[] t_arr)
-	{
-		MeshFilter[] mfs = GetComponents<MeshFilter>(t_arr);
-		Mesh[] m = new Mesh[mfs.Length];
-		for(int i = 0; i < mfs.Length; i++)
-			m[i] = mfs[i].sharedMesh;
-		return m;
-	}
-
-	public static GameObject[] GetGameObjectsWithComponent<T>(Transform[] t_arr) where T : Component
-	{
-		List<GameObject> c = new List<GameObject>();
-		foreach(Transform t in t_arr)
+		public static Mesh[] GetMeshes(Transform[] t_arr)
 		{
-			if(t.GetComponent<T>())	
-				c.Add(t.gameObject);
+			MeshFilter[] mfs = GetComponents<MeshFilter>(t_arr);
+			Mesh[] m = new Mesh[mfs.Length];
+			for(int i = 0; i < mfs.Length; i++)
+				m[i] = mfs[i].sharedMesh;
+			return m;
 		}
-		return c.ToArray() as GameObject[];
-	}
 
-	public static string ToFormattedString(this int[] arr, string seperator)
-	{
-		if(arr == null || arr.Length < 1)
-			return "";
+		public static GameObject[] GetGameObjectsWithComponent<T>(Transform[] t_arr) where T : Component
+		{
+			List<GameObject> c = new List<GameObject>();
+			foreach(Transform t in t_arr)
+			{
+				if(t.GetComponent<T>())	
+					c.Add(t.gameObject);
+			}
+			return c.ToArray() as GameObject[];
+		}
 
-		string str = "";
-		for(int i = 0; i < arr.Length-1; i++)
-			str += arr[i].ToString() + seperator;
-		str += arr[arr.Length-1];
-		return str;
+		public static string ToFormattedString(this int[] arr, string seperator)
+		{
+			if(arr == null || arr.Length < 1)
+				return "";
+
+			string str = "";
+			for(int i = 0; i < arr.Length-1; i++)
+				str += arr[i].ToString() + seperator;
+			str += arr[arr.Length-1];
+			return str;
+		}
 	}
-}
+#endregion
