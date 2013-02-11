@@ -5,7 +5,21 @@
 //	- Tile material preview
 //	- Click mesh to select uvs
 //	- add auto gen. uv2
-//	- speed up u_lines generation
+// 	- UpdateGUIPointCache on window resize
+//	- set startup window size
+//	- when a top level transform is selected, uvs don't move correclty
+//	- updateGUIPointCache on GUI changes
+//	- draw texture toggle undoes selection
+//	- biig undo (revert to original)
+//	- adding to selection undoes selection
+
+// FUTURE TODO:
+//	- rotate uvs
+//	- move per axis
+//	- scale uvs
+//	- snap to grid?
+//	- cut uvs
+//	- merge uvs (how would that work without screwing up vertices?)
 
 using UnityEngine;
 using UnityEditor;
