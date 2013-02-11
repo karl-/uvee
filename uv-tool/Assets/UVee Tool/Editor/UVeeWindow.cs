@@ -5,7 +5,7 @@
 //	- Tile material preview
 //	- Click mesh to select uvs
 //	- add auto gen. uv2
-//	- make move tool more visible
+//	- speed up u_lines generation
 
 using UnityEngine;
 using UnityEditor;
@@ -37,7 +37,7 @@ public class UVeeWindow : EditorWindow {
 
 	MeshFilter[] selection = new MeshFilter[0];
 	int submesh = 0;
-	List<int>[] selected_triangles = new List<int>[0];
+	HashSet<int>[] selected_triangles = new HashSet<int>[0];
 	Texture2D tex;
 
 	// GUI draw caches
@@ -51,6 +51,8 @@ public class UVeeWindow : EditorWindow {
 	// selection caches
 	int[][]			distinct_triangle_selection = new int[0][];	///< Guarantees that only one index per vertex is present
 	Mesh[]			lastMeshUndoCache = new Mesh[0]{};
+
+	bool[] 			validChannel	= new bool[0]{};
 #endregion
 
 #region CONSTANT
@@ -138,9 +140,163 @@ public class UVeeWindow : EditorWindow {
 	}
 #endregion
 
-#region GET EVENT
+#region EVENT
 
 	public bool UndoRedoPerformed { get { return Event.current.type == EventType.ValidateCommand && Event.current.commandName == "UndoRedoPerformed"; } }
+
+	/**
+	 *	\brief Force update the mesh with old UVs.
+	 */
+	public void UndoPerformed()
+	{
+		UpdateGUIPointCache();
+		foreach(Mesh m in lastMeshUndoCache)
+		{
+			m.uv = m.uv;
+			m.uv2 = m.uv2;
+		}
+	}
+
+	public void OnFocus()
+	{
+		OnSelectionChange();
+	}
+
+	public void OnSelectionChange()
+	{
+		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
+		selected_triangles = new HashSet<int>[selection.Length];
+
+		for(int i = 0; i < selection.Length; i++)
+			selected_triangles[i] = new HashSet<int>();
+
+		if(selection != null && selection.Length > 0)
+		{
+			// ??
+			Object t = selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
+			tex = (t == null) ? null : (Texture2D)t;
+		}
+		
+		UpdateGUIPointCache();
+	}
+
+	public void UpdateSelectionWithGUIRect(Rect rect, bool shift)
+	{
+		bool pointSelected = false;
+		// avoid if checks if shift isn't held - (this loop is already slow, so take speed improvements where we can)
+		if(!shift)
+		{
+			for(int i = 0; i < selection.Length; i++)
+			{
+				if(!validChannel[i])
+					continue;
+
+				selected_triangles[i].Clear();
+				int[] tris = selection[i].sharedMesh.triangles;
+				for(int n = 0; n < tris.Length; n++)
+				{
+					if(rect.Contains(uv_points[i][tris[n]]))
+					{
+						pointSelected = true;
+						selected_triangles[i].Add( tris[n] );
+					}
+				}
+			}
+		}
+		else
+		{
+			for(int i = 0; i < selection.Length; i++)
+			{
+				if(!validChannel[i])
+					continue;
+				
+				int[] tris = selection[i].sharedMesh.triangles;
+
+				for(int n = 0; n < tris.Length; n++)
+				{
+					if(rect.Contains(uv_points[i][tris[n]]))
+					{
+						pointSelected = true;
+
+						if(distinct_triangle_selection[i].Contains(tris[n]))
+							selected_triangles[i].Remove(tris[n]);
+						else
+							selected_triangles[i].Add( tris[n] );
+					}
+				}
+			}
+		}
+
+		if(!pointSelected)
+			OnSelectionChange();
+
+		UpdateGUIPointCache();
+	}
+
+	// Call after UVs are selected, or the GUI space has been modified
+	public void UpdateGUIPointCache()
+	{	
+		// LogStart("UpdateGUIPointCache");
+
+		uv_points 					= new Vector2[selection.Length][];
+		user_points 				= new Vector2[selection.Length][];
+		triangle_points 			= new Vector2[selection.Length][];
+		user_triangle_points 		= new Vector2[selection.Length][];
+		distinct_triangle_selection = new int 	 [selection.Length][];
+		validChannel				= new bool   [selection.Length];
+
+		all_points = new List<Vector2>();
+
+		for(int i = 0; i < selection.Length; i++)
+		{
+			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
+			if(uv_points[i] == null || uv_points[i].Length < 1)
+			{
+				user_points[i]					= new Vector2[0]{};
+				triangle_points[i]				= new Vector2[0]{};
+				user_triangle_points[i] 		= new Vector2[0]{};
+				distinct_triangle_selection[i] 	= new int[0]{};
+				validChannel[i] = false;
+				continue;
+			}
+
+			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
+			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], distinct_triangle_selection[i]));
+			all_points.AddRange(user_points[i]);
+			validChannel[i] = true;
+
+			int[] tris = selection[i].sharedMesh.triangles;
+			List<Vector2> lines = new List<Vector2>();
+			List<Vector2> u_lines = new List<Vector2>();
+			for(int n = 0; n < tris.Length; n+=3)
+			{
+				Vector2 p0 = uv_points[i][tris[n+0]];
+				Vector2 p1 = uv_points[i][tris[n+1]];
+				Vector2 p2 = uv_points[i][tris[n+2]];
+
+				// HashSet.Contains() is about a gazillion times faster than List.Contains()
+				bool p0_s = selected_triangles[i].Contains(tris[n+0]);
+				bool p1_s = selected_triangles[i].Contains(tris[n+1]);
+				bool p2_s = selected_triangles[i].Contains(tris[n+2]);
+
+				if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
+				if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
+				if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
+
+				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
+			}
+
+			triangle_points[i] = lines.ToArray();
+			user_triangle_points[i] = u_lines.ToArray();
+			// Debug.Log(distinct_triangle_selection[i].ToFormattedString(", ") + "\n" + selected_triangles[i].ToArray().ToFormattedString(", "));
+		}
+
+		uv_center = Average(all_points);
+
+		SceneView.RepaintAll();
+
+		// LogFinish("UpdateGUIPointCache");
+	}
 #endregion
 
 #region GUI
@@ -319,157 +475,6 @@ public class UVeeWindow : EditorWindow {
 			}
 			Handles.color = Color.white;
 		}
-	}
-#endregion
-
-#region EVENT
-			
-	/**
-	 *	\brief Force update the mesh with old UVs.
-	 */
-	public void UndoPerformed()
-	{
-		UpdateGUIPointCache();
-		foreach(Mesh m in lastMeshUndoCache)
-		{
-			m.uv = m.uv;
-			m.uv2 = m.uv2;
-		}
-	}
-
-	public void OnFocus()
-	{
-		OnSelectionChange();
-	}
-
-	public void OnSelectionChange()
-	{
-		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
-		selected_triangles = new List<int>[selection.Length];
-
-		for(int i = 0; i < selection.Length; i++)
-			selected_triangles[i] = new List<int>();
-
-		if(selection != null && selection.Length > 0)
-		{
-			// ??
-			Object t = selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
-			tex = (t == null) ? null : (Texture2D)t;
-		}
-		
-		UpdateGUIPointCache();
-	}
-
-	public void UpdateSelectionWithGUIRect(Rect rect, bool shift)
-	{
-		bool pointSelected = false;
-		// avoid if checks if shift isn't held - (this loop is already slow, so take speed improvements where we can)
-		if(!shift)
-		{
-			for(int i = 0; i < selection.Length; i++)
-			{
-				if(!ValidUVPoints(selection[i], uv_points[i]))
-					continue;
-
-				selected_triangles[i].Clear();
-				int[] tris = selection[i].sharedMesh.triangles;
-				for(int n = 0; n < tris.Length; n++)
-				{
-					if(rect.Contains(uv_points[i][tris[n]]))
-					{
-						pointSelected = true;
-						selected_triangles[i].Add( tris[n] );
-					}
-				}
-			}
-		}
-		else
-		{
-			for(int i = 0; i < selection.Length; i++)
-			{
-				// selected_triangles[i].Clear();
-				int[] tris = selection[i].sharedMesh.triangles;
-
-				for(int n = 0; n < tris.Length; n++)
-				{
-					if(rect.Contains(uv_points[i][tris[n]]))
-					{
-						pointSelected = true;
-
-						if(distinct_triangle_selection[i].Contains(tris[n]))
-							selected_triangles[i].Remove(tris[n]);
-						else
-							selected_triangles[i].Add( tris[n] );
-					}
-				}
-			}
-		}
-
-		if(!pointSelected)
-			OnSelectionChange();
-
-		UpdateGUIPointCache();
-	}
-
-	// Call after UVs are selected, or the GUI space has been modified
-	public void UpdateGUIPointCache()
-	{	
-		LogStart("UpdateGUIPointCache");
-
-		uv_points 					= new Vector2[selection.Length][];
-		user_points 				= new Vector2[selection.Length][];
-		triangle_points 			= new Vector2[selection.Length][];
-		user_triangle_points 		= new Vector2[selection.Length][];
-		distinct_triangle_selection = new int 	 [selection.Length][];
-
-		all_points = new List<Vector2>();
-
-		for(int i = 0; i < selection.Length; i++)
-		{
-			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
-			if(uv_points[i] == null || uv_points[i].Length < 1)
-			{
-				user_points[i]					= new Vector2[0]{};
-				triangle_points[i]				= new Vector2[0]{};
-				user_triangle_points[i] 		= new Vector2[0]{};
-				distinct_triangle_selection[i] 	= new int[0]{};
-				continue;
-			}
-
-			distinct_triangle_selection[i] = selected_triangles[i].Distinct().ToArray();
-			user_points[i] = UVToGUIPoint(UVArrayWithTriangles(selection[i], distinct_triangle_selection[i]));
-			all_points.AddRange(user_points[i]);
-
-			int[] tris = selection[i].sharedMesh.triangles;
-			List<Vector2> lines = new List<Vector2>();
-			List<Vector2> u_lines = new List<Vector2>();
-			for(int n = 0; n < tris.Length; n+=3)
-			{
-				Vector2 p0 = uv_points[i][tris[n+0]];
-				Vector2 p1 = uv_points[i][tris[n+1]];
-				Vector2 p2 = uv_points[i][tris[n+2]];
-
-				// this could be sped up
-				bool p0_s = selected_triangles[i].Contains(tris[n+0]);
-				bool p1_s = selected_triangles[i].Contains(tris[n+1]);
-				bool p2_s = selected_triangles[i].Contains(tris[n+2]);
-				if(p0_s && p1_s) { u_lines.Add(p0); u_lines.Add(p1); }
-				if(p1_s && p2_s) { u_lines.Add(p1); u_lines.Add(p2); }
-				if(p0_s && p2_s) { u_lines.Add(p2); u_lines.Add(p0); }
-
-				lines.AddRange(new Vector2[6] {p0, p1, p1, p2, p2, p0});
-			}
-
-			triangle_points[i] = lines.ToArray();
-			user_triangle_points[i] = u_lines.ToArray();
-			// Debug.Log(distinct_triangle_selection[i].ToFormattedString(", ") + "\n" + selected_triangles[i].ToArray().ToFormattedString(", "));
-		}
-
-		uv_center = Average(all_points);
-
-		SceneView.RepaintAll();
-
-		LogFinish("UpdateGUIPointCache");
 	}
 #endregion
 
