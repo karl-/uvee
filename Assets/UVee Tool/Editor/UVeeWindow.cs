@@ -152,6 +152,17 @@ public class UVeeWindow : EditorWindow {
 		OnSelectionChange();
 		Repaint();
 	}
+	
+	public void OnDisable()
+	{
+		if(SceneView.onSceneGUIDelegate == this.OnSceneGUI)
+		{
+			ClearAll();
+			SceneView.RepaintAll();
+
+			SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
+		}
+	}
 #endregion
 
 #region EVENT
@@ -310,6 +321,18 @@ public class UVeeWindow : EditorWindow {
 		SceneView.RepaintAll();
 
 		// LogFinish("UpdateGUIPointCache");
+	}
+
+	public void ClearAll()
+	{
+		uv_points 					= new Vector2[0][];
+		user_points 				= new Vector2[0][];
+		triangle_points 			= new Vector2[0][];
+		user_triangle_points 		= new Vector2[0][];
+		distinct_triangle_selection = new int 	 [0][];
+		validChannel				= new bool   [0];
+
+		all_points = new List<Vector2>();
 	}
 #endregion
 
@@ -642,9 +665,6 @@ public class UVeeWindow : EditorWindow {
 		{
 			Vector2 delta = GUIToUVPoint(dragging_uv_start) - GUIToUVPoint(e.mousePosition);
 
-			// because gui is called 2x?
-			delta /= 2f;
-
 			dragging_uv_start = e.mousePosition;
 			TranslateUVs(distinct_triangle_selection, delta);
 
@@ -825,7 +845,7 @@ public class UVeeWindow : EditorWindow {
 		LogMethodTime(methodName, (float)EditorApplication.timeSinceStartup - timer[methodName]);
 	}
 
-	public void OnDisable()
+	public void DumpTimes()
 	{
 		foreach(KeyValuePair<string, List<float>> kvp in methodExecutionTimes)
 		{
@@ -859,8 +879,6 @@ public class UVeeWindow : EditorWindow {
 			List<T> c = new List<T>();
 			foreach(Transform t in t_arr)
 			{
-				if(t.GetComponent<T>())	
-					c.Add(t.GetComponent<T>());
 				c.AddRange(t.GetComponentsInChildren<T>());
 			}
 			return c.ToArray() as T[];
