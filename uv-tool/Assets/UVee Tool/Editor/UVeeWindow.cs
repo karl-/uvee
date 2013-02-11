@@ -94,8 +94,8 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
-	Color MOVE_TOOL_COLOR 			= new Color(.116f, .116f, .116f, 1f);
-	Color MOVE_TOOL_COLOR_OUTLINE 	= Color.white;
+	Color MOVE_TOOL_COLOR 			= Color.white;
+	Color MOVE_TOOL_COLOR_OUTLINE 	= Color.black;
 
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
