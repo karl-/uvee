@@ -5,9 +5,7 @@
 //	- Tile material preview
 //	- Click mesh to select uvs
 //	- add auto gen. uv2
-// 	- UpdateGUIPointCache on window resize
 //	- set startup window size
-//	- when a top level transform is selected, uvs don't move correclty
 //	- updateGUIPointCache on GUI changes
 //	- draw texture toggle undoes selection
 //	- biig undo (revert to original)
@@ -182,6 +180,14 @@ public class UVeeWindow : EditorWindow {
 		}
 	}
 
+	int screenWidth = 0;
+	int screenHeight = 0;
+	public void OnWindowResize()
+	{
+		UpdateGUIPointCache();
+		Repaint();
+	}
+
 	public void OnFocus()
 	{
 		OnSelectionChange();
@@ -351,6 +357,9 @@ public class UVeeWindow : EditorWindow {
 	Vector2 zoom_dragging_start = Vector2.zero;
 	void OnGUI()
 	{
+		if(Screen.width != screenWidth || Screen.height != screenHeight)
+			OnWindowResize();
+
 		//** Handle events **//
 		Event e = Event.current;
 
