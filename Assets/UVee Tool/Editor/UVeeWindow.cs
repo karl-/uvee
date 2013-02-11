@@ -56,7 +56,7 @@ public class UVeeWindow : EditorWindow {
 #region CONSTANT
 
 	const int MIN_ZOOM = 1;
-	const int MAX_ZOOM = 1000;
+	const int MAX_ZOOM = 2000;
 
 	const int LINE_WIDTH = 1;
 	Color LINE_COLOR = Color.gray;
@@ -82,7 +82,18 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
-	Color MOVE_TOOL_COLOR = new Color(.116f, .116f, .116f, 1f);
+	Rect moveToolOutlineRect { get {
+			int size = 36;// = moveTool.width / (100/workspace_scale);
+
+			return new Rect(
+				uv_center.x - size/2,
+				uv_center.y - size/2,
+				size,
+				size);
+		}
+	}
+	Color MOVE_TOOL_COLOR 			= new Color(.116f, .116f, .116f, 1f);
+	Color MOVE_TOOL_COLOR_OUTLINE 	= Color.white;
 
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
@@ -233,9 +244,9 @@ public class UVeeWindow : EditorWindow {
 			for(int i = 0; i < selected_triangles.Length; i++)
 				DrawLines(triangle_points[i], new Color(.2f, .2f, .2f, .2f));
 
-		// if(drawTriangles)
-		// 	for(int i = 0; i < selected_triangles.Length; i++)
-		// 		DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+		if(drawTriangles)
+			for(int i = 0; i < selected_triangles.Length; i++)
+				DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
@@ -247,7 +258,9 @@ public class UVeeWindow : EditorWindow {
 		//** Draw Preferences Pane **//
 		DrawPreferencesPane();
 
-		// move tools	
+		// Draw Move Tool iamge
+		GUI.color = MOVE_TOOL_COLOR_OUTLINE;
+			GUI.DrawTexture(moveToolOutlineRect, moveTool, ScaleMode.ScaleToFit, true, 0);
 		GUI.color = MOVE_TOOL_COLOR;
 			GUI.DrawTexture(moveToolRect, moveTool, ScaleMode.ScaleToFit, true, 0);
 		GUI.color = Color.white;
@@ -355,6 +368,9 @@ public class UVeeWindow : EditorWindow {
 		{
 			for(int i = 0; i < selection.Length; i++)
 			{
+				if(!ValidUVPoints(selection[i], uv_points[i]))
+					continue;
+
 				selected_triangles[i].Clear();
 				int[] tris = selection[i].sharedMesh.triangles;
 				for(int n = 0; n < tris.Length; n++)
@@ -625,7 +641,7 @@ public class UVeeWindow : EditorWindow {
 	}
 #endregion
 
-#region UV UTILITY
+#region UV WRANGLING
 
 	public void TranslateUVs(int[][] uv_selection, Vector2 uvDelta)
 	{
@@ -633,7 +649,6 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			Debug.Log(uv_selection[i].ToFormattedString(", "));
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
 			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
@@ -679,6 +694,11 @@ public class UVeeWindow : EditorWindow {
 		foreach(int tri in tris)
 			uvs.Add(mf_uv[tri]);
 		return uvs.ToArray();
+	}
+
+	public bool ValidUVPoints(MeshFilter mf, Vector2[] uvs)
+	{
+		return(uvs != null && uvs.Length == mf.sharedMesh.vertices.Length);
 	}
 
 	// Returns a rect in GUI coordinates
