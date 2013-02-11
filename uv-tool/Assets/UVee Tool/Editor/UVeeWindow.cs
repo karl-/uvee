@@ -258,7 +258,7 @@ public class UVeeWindow : EditorWindow {
 			}
 		}
 
-		if(!pointSelected)
+		if(!pointSelected && !shift)
 			OnSelectionChange();
 
 		UpdateGUIPointCache();
