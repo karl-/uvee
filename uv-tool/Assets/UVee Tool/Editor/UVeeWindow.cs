@@ -2,16 +2,9 @@
 #define DEBUG
 
 // TODO:
+//	- adding transform to selection undoes selection
 //	- Tile material preview
 //	- Click mesh to select uvs
-//	- add auto gen. uv2
-//	- set startup window size
-//	- updateGUIPointCache on GUI changes
-//	- draw texture toggle undoes selection
-//	- biig undo (revert to original)
-//	- adding to selection undoes selection
-
-// FUTURE TODO:
 //	- rotate uvs
 //	- move per axis
 //	- scale uvs
@@ -517,7 +510,7 @@ public class UVeeWindow : EditorWindow {
 				Handles.DotCap(0,
 					v[tris[n]],
 					Quaternion.identity,
-					.2f);
+					HandleUtility.GetHandleSize(v[tris[n]]) * .05f);
 			}
 			Handles.color = Color.white;
 		}
@@ -619,6 +612,9 @@ public class UVeeWindow : EditorWindow {
 
 		GUILayout.BeginHorizontal();
 			showPreferences = EditorGUILayout.Foldout(showPreferences, "Preferences");
+			if(GUILayout.Button("Revert to Original"))
+				Revert(selection);
+
 		GUILayout.EndHorizontal();
 			if(showPreferences)
 			{
@@ -661,7 +657,7 @@ public class UVeeWindow : EditorWindow {
 		{
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
-			lastMeshUndoCache = TransformExtensions.GetMeshes(Selection.transforms);
+			lastMeshUndoCache = Selection.transforms.GetMeshes();
 			Undo.SetSnapshotTarget(lastMeshUndoCache as Object[], "Move UVs");
 
 			for(int i = 0; i < Selection.transforms.Length; i++)
@@ -697,6 +693,9 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
+			if(!selection[i].sharedMesh.name.Contains("uvee-"))
+				CreateMeshInstance(selection[i]);
+
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
 			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
@@ -707,6 +706,9 @@ public class UVeeWindow : EditorWindow {
 				selection[i].sharedMesh.uv = uvs;
 			else
 				selection[i].sharedMesh.uv2 = uvs;
+
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
+			PrefabUtility.SetPropertyModifications(selection[i], propmods);
 		}
 	}
 #endregion
@@ -716,6 +718,39 @@ public class UVeeWindow : EditorWindow {
 	public Color RandomColor()
 	{
 		return new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1f);
+	}
+
+	public void Revert(MeshFilter[] mfs)
+	{
+		foreach(MeshFilter mf in mfs)
+		{
+			PrefabUtility.ReconnectToLastPrefab(mf.gameObject);
+			PrefabUtility.ResetToPrefabState(mf);
+		}
+	}
+
+	public void CreateMeshInstance(MeshFilter mf)
+	{
+		// why can't MemberwiseClone() work!?  blargh.
+		Mesh m = new Mesh();
+		m.vertices = mf.sharedMesh.vertices;
+		m.subMeshCount = mf.sharedMesh.subMeshCount;
+		for(int i = 0; i < m.subMeshCount; i++)
+			m.SetTriangles(mf.sharedMesh.GetTriangles(i), i);
+		m.normals = mf.sharedMesh.normals;
+		m.uv = mf.sharedMesh.uv;
+		m.uv2 = mf.sharedMesh.uv2;
+		m.tangents = mf.sharedMesh.tangents;
+		m.colors = mf.sharedMesh.colors;
+		m.colors32 = mf.sharedMesh.colors32;
+		m.boneWeights = mf.sharedMesh.boneWeights;
+		m.bindposes = mf.sharedMesh.bindposes;
+		m.bounds = mf.sharedMesh.bounds;
+
+		m.name = "uvee-" + mf.sharedMesh.name;
+
+		PrefabUtility.DisconnectPrefabInstance(mf);
+		mf.sharedMesh = m;
 	}
 
 	public void PopulateColorArray()
@@ -893,7 +928,7 @@ public class UVeeWindow : EditorWindow {
 			return c.ToArray() as T[];
 		}
 
-		public static Mesh[] GetMeshes(Transform[] t_arr)
+		public static Mesh[] GetMeshes(this Transform[] t_arr)
 		{
 			MeshFilter[] mfs = GetComponents<MeshFilter>(t_arr);
 			Mesh[] m = new Mesh[mfs.Length];
