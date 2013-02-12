@@ -55,7 +55,6 @@ public class UVeeWindow : EditorWindow {
 
 	// selection caches
 	int[][]			distinct_triangle_selection = new int[0][];	///< Guarantees that only one index per vertex is present
-	Mesh[]			lastMeshUndoCache = new Mesh[0]{};
 
 	bool[] 			validChannel	= new bool[0]{};
 #endregion
@@ -166,7 +165,7 @@ public class UVeeWindow : EditorWindow {
 	public void UndoPerformed()
 	{
 		UpdateGUIPointCache();
-		foreach(Mesh m in lastMeshUndoCache)
+		foreach(Mesh m in Selection.transforms.GetMeshes())
 		{
 			m.uv = m.uv;
 			m.uv2 = m.uv2;
@@ -657,8 +656,8 @@ public class UVeeWindow : EditorWindow {
 		{
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
-			lastMeshUndoCache = Selection.transforms.GetMeshes();
-			Undo.SetSnapshotTarget(lastMeshUndoCache as Object[], "Move UVs");
+
+			Undo.SetSnapshotTarget(Selection.transforms.GetMeshes() as Object[], "Move UVs");
 
 			for(int i = 0; i < Selection.transforms.Length; i++)
 				EditorUtility.SetDirty(Selection.transforms[i]);
@@ -727,6 +726,7 @@ public class UVeeWindow : EditorWindow {
 			PrefabUtility.ReconnectToLastPrefab(mf.gameObject);
 			PrefabUtility.ResetToPrefabState(mf);
 		}
+		EditorUtility.UnloadUnusedAssets();
 	}
 
 	public void CreateMeshInstance(MeshFilter mf)
@@ -916,6 +916,7 @@ public class UVeeWindow : EditorWindow {
 }
 
 #region EXTENSION
+
 	public static class TransformExtensions
 	{
 		public static T[] GetComponents<T>(Transform[] t_arr) where T : Component
