@@ -415,6 +415,7 @@ public class UVeeWindow : EditorWindow {
 		if(e.type == EventType.ScrollWheel)
 		{
 			float modifier = -1f;
+			offset += new Vector2(e.delta.y, e.delta.y);
 			workspace_scale = (int)Mathf.Clamp(workspace_scale + (e.delta.y * modifier), MIN_ZOOM, MAX_ZOOM);
 			scrolling = true;
 		}
@@ -605,13 +606,14 @@ public class UVeeWindow : EditorWindow {
 	{
 		settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
 		settingsMaxWidth = (int)settingsBoxRect.width-settingsBoxPad*2;
+		Rect revertRect = new Rect(Screen.width-200-settingsBoxPad*2-10, 10, 200, 20);
 
 		GUI.Box(settingsBoxRect, "");
 		GUI.BeginGroup(settingsBoxRect);
 
 		GUILayout.BeginHorizontal();
 			showPreferences = EditorGUILayout.Foldout(showPreferences, "Preferences");
-			if(GUILayout.Button("Revert to Original"))
+			if(GUI.Button(revertRect, "Revert to Original"))
 				Revert(selection);
 
 		GUILayout.EndHorizontal();
