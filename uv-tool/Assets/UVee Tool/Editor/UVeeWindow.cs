@@ -116,7 +116,7 @@ public class UVeeWindow : EditorWindow {
 	int settingsBoxHeight;
 
 	int settingsBoxPad = 10;
-	int settingsMaxWidth = 0;
+	int PREFERENCES_MAX_WIDTH = 0;
 	Rect settingsBoxRect = new Rect();
 	
 	Vector2 offset = new Vector2(0f, 0f);
@@ -605,7 +605,7 @@ public class UVeeWindow : EditorWindow {
 	public void DrawPreferencesPane()
 	{
 		settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
-		settingsMaxWidth = (int)settingsBoxRect.width-settingsBoxPad*2;
+		PREFERENCES_MAX_WIDTH = ((int)settingsBoxRect.width-settingsBoxPad*2) / 2 - settingsBoxPad;
 		Rect revertRect = new Rect(Screen.width-200-settingsBoxPad*2-10, 10, 200, 20);
 		Rect foldoutRect = new Rect(7, 10, 20, 20);
 
@@ -615,31 +615,42 @@ public class UVeeWindow : EditorWindow {
 			showPreferences = EditorGUI.Foldout(foldoutRect, showPreferences, "Preferences");
 			if(GUI.Button(revertRect, "Revert to Original"))
 				Revert(selection);
-			GUILayout.Space(foldoutRect.height+5);
+
+			GUILayout.Space(foldoutRect.height+15);
 
 			if(showPreferences)
 			{
-				settingsBoxHeight = expandedSettingsHeight;
-				workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(settingsMaxWidth));
-				
-				GUI.changed = false;
-				uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(settingsMaxWidth));
+				GUILayout.BeginHorizontal();
+				GUILayout.BeginVertical();
+					settingsBoxHeight = expandedSettingsHeight;
+					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					
+					GUI.changed = false;
+					uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
+					submeshes[0] = "All";
+					for(int i = 1; i < submeshes.Length; i++)
+						submeshes[i] = (i-1).ToString();
+					submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
 
-				showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(settingsMaxWidth));
-				drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(settingsMaxWidth));
+					if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH)))
+					{
+						GenerateUV2(selection);
+					}
+				GUILayout.EndVertical();
 
-				GUI.changed = false;
-				showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(settingsMaxWidth));
-				if(GUI.changed) OnSelectionChange();
+				GUILayout.BeginVertical();
+					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					
+					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
 
-				drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(settingsMaxWidth));
-				
-				string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
-				submeshes[0] = "All";
-				for(int i = 1; i < submeshes.Length; i++)
-					submeshes[i] = (i-1).ToString();
+					GUI.changed = false;
+					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					if(GUI.changed) OnSelectionChange();
 
-				submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(settingsMaxWidth));
+				GUILayout.EndVertical();
+				GUILayout.EndHorizontal();
 			}
 			else
 				settingsBoxHeight = compactSettingsHeight;
@@ -659,7 +670,7 @@ public class UVeeWindow : EditorWindow {
 			for(int i = 0; i < selection.Length; i++)
 				if(!selection[i].sharedMesh.name.Contains("uvee-"))
 					CreateMeshInstance(selection[i]);
-					
+
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
 
@@ -711,6 +722,14 @@ public class UVeeWindow : EditorWindow {
 
 			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
 			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+		}
+	}
+
+	public void GenerateUV2(MeshFilter[] selection)
+	{
+		for(int i = 0; i < selection.Length; i++)
+		{
+			Unwrapping.GenerateSecondaryUVSet(selection[i].sharedMesh);
 		}
 	}
 #endregion
