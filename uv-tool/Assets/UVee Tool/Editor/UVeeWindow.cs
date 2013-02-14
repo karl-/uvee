@@ -1,7 +1,7 @@
 #pragma warning disable 0649, 0219
 #define DEBUG
 
-// TODO:
+// TODO ...(someday):
 //	- adding transform to selection undoes selection
 //	- Tile material preview
 //	- Click mesh to select uvs
@@ -607,16 +607,16 @@ public class UVeeWindow : EditorWindow {
 		settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
 		settingsMaxWidth = (int)settingsBoxRect.width-settingsBoxPad*2;
 		Rect revertRect = new Rect(Screen.width-200-settingsBoxPad*2-10, 10, 200, 20);
+		Rect foldoutRect = new Rect(7, 10, 20, 20);
 
 		GUI.Box(settingsBoxRect, "");
 		GUI.BeginGroup(settingsBoxRect);
 
-		GUILayout.BeginHorizontal();
-			showPreferences = EditorGUILayout.Foldout(showPreferences, "Preferences");
+			showPreferences = EditorGUI.Foldout(foldoutRect, showPreferences, "Preferences");
 			if(GUI.Button(revertRect, "Revert to Original"))
 				Revert(selection);
+			GUILayout.Space(foldoutRect.height+5);
 
-		GUILayout.EndHorizontal();
 			if(showPreferences)
 			{
 				settingsBoxHeight = expandedSettingsHeight;
@@ -656,6 +656,10 @@ public class UVeeWindow : EditorWindow {
 		Event e = Event.current;
 		if(e.type == EventType.MouseDown && moveToolRect.Contains(e.mousePosition)) 
 		{
+			for(int i = 0; i < selection.Length; i++)
+				if(!selection[i].sharedMesh.name.Contains("uvee-"))
+					CreateMeshInstance(selection[i]);
+					
 			dragging_uv = true;
 			dragging_uv_start = e.mousePosition;
 
@@ -694,9 +698,6 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			if(!selection[i].sharedMesh.name.Contains("uvee-"))
-				CreateMeshInstance(selection[i]);
-
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
 			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
