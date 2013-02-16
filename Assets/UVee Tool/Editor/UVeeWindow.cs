@@ -111,7 +111,7 @@ public class UVeeWindow : EditorWindow {
 
 	float scale = 0f;
 
-	int expandedSettingsHeight = 180;
+	int expandedSettingsHeight = 140;
 	int compactSettingsHeight = 50;
 	int settingsBoxHeight;
 
