@@ -288,7 +288,7 @@ public class UVeeWindow : EditorWindow {
 			all_points.AddRange(user_points[i]);
 			validChannel[i] = true;
 
-			int[] tris = selection[i].sharedMesh.triangles;
+			int[] tris = (submesh == 0) ? selection[i].sharedMesh.triangles : selection[i].sharedMesh.GetTriangles(submesh-1);
 			List<Vector2> lines = new List<Vector2>();
 			List<Vector2> u_lines = new List<Vector2>();
 			for(int n = 0; n < tris.Length; n+=3)
