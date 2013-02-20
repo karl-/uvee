@@ -188,6 +188,16 @@ public class UVeeWindow : EditorWindow {
 	public void OnSelectionChange()
 	{
 		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
+
+		// I'm not sure why this is necessary, as the sharedMesh is never directly modified.  When in Rome, I reckon.
+		#if UNITY_4_0
+		for(int i = 0; i < selection.Length; i++)
+		{
+			if(!selection[i].sharedMesh.isReadable)
+				selection[i].sharedMesh.SetIsReadable(true);
+		}
+		#endif
+
 		selected_triangles = new HashSet<int>[selection.Length];
 
 		for(int i = 0; i < selection.Length; i++)
@@ -970,6 +980,17 @@ public class UVeeWindow : EditorWindow {
 			}
 			return c.ToArray() as GameObject[];
 		}
+
+		#if UNITY_4_0
+		public static void SetIsReadable(this Mesh m, bool readable)
+		{
+			AssetImporter ai = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(m));
+			if(ai.GetType() == typeof(ModelImporter))
+				((ModelImporter)ai).isReadable = readable;
+
+			AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+		}	
+		#endif
 
 		public static string ToFormattedString(this int[] arr, string seperator)
 		{
