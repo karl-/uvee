@@ -451,20 +451,7 @@ public class UVeeWindow : EditorWindow {
 		// dragging uvs around -- drawing takes place at the end of OnGUI
 		if(e.isMouse && e.button == 0 && e.modifiers == (EventModifiers)0 && !settingsBoxRect.Contains(e.mousePosition))
 		{
-			switch(tool)
-			{
-				case UVTool.None:
-					break;
-				case UVTool.Move:
-					UVMoveTool();
-					break;
-				case UVTool.Scale:
-					UVScaleTool();
-					break;
-				case UVTool.Rotate:
-					UVRotateTool();
-					break;
-			}
+			UVTranslationTool(tool);
 		}
 
 		if(e.type == EventType.MouseUp && e.button == 0 && mouseDragging) {
@@ -708,6 +695,8 @@ public class UVeeWindow : EditorWindow {
 				GUILayout.EndVertical();
 				GUILayout.EndHorizontal();
 
+				GUILayout.Space(5);
+
 				// Toolbar
 				GUILayout.BeginHorizontal();
 
@@ -764,7 +753,7 @@ public class UVeeWindow : EditorWindow {
 	
 	bool dragging_tool = false;
 	Vector2 dragging_tool_start = Vector2.zero;
-	public void UVMoveTool()
+	public void UVTranslationTool(UVTool currentTool)
 	{
 		Event e = Event.current;
 		if(e.type == EventType.MouseDown && TOOL_RECT.Contains(e.mousePosition)) 
@@ -789,51 +778,21 @@ public class UVeeWindow : EditorWindow {
 			Vector2 delta = GUIToUVPoint(dragging_tool_start) - GUIToUVPoint(e.mousePosition);
 
 			dragging_tool_start = e.mousePosition;
-			TranslateUVs(distinct_triangle_selection, delta);
 
-			UpdateGUIPointCache();
-			Repaint();
-		}
-
-		if((e.type == EventType.MouseUp || e.type == EventType.Ignore) && dragging_tool)
-		{
-			dragging_tool = false;
-			UpdateGUIPointCache();
-		}
-	}
-
-	public void UVRotateTool()
-	{
-
-	}
-
-	public void UVScaleTool()
-	{
-		Event e = Event.current;
-		if(e.type == EventType.MouseDown && TOOL_RECT.Contains(e.mousePosition)) 
-		{
-			for(int i = 0; i < selection.Length; i++)
-				if(!selection[i].sharedMesh.name.Contains("uvee-"))
-					CreateMeshInstance(selection[i]);
-
-			dragging_tool = true;
-			dragging_tool_start = e.mousePosition;
-
-			Undo.SetSnapshotTarget(Selection.transforms.GetMeshes() as Object[], "Scale UVs");
-
-			for(int i = 0; i < Selection.transforms.Length; i++)
-				EditorUtility.SetDirty(Selection.transforms[i]);
-			Undo.CreateSnapshot();
-			Undo.RegisterSnapshot();
-		}
-
-		if(dragging_tool)
-		{
-			Vector2 delta = GUIToUVPoint(dragging_tool_start) - GUIToUVPoint(e.mousePosition);
-
-			dragging_tool_start = e.mousePosition;
-			
-			ScaleUVs(distinct_triangle_selection, Vector2.one + delta);
+			switch(currentTool)
+			{
+				case UVTool.None:
+					break;
+				case UVTool.Move:
+					TranslateUVs(distinct_triangle_selection, delta);
+					break;
+				case UVTool.Scale:
+					ScaleUVs(distinct_triangle_selection, Vector2.one + delta);
+					break;
+				case UVTool.Rotate:
+					RotateUVs(distinct_triangle_selection, delta);
+					break;
+			}
 
 			UpdateGUIPointCache();
 			Repaint();
@@ -885,6 +844,30 @@ public class UVeeWindow : EditorWindow {
 				p.Scale(uvDelta);
 				p += centerPoint;
 				uvs[uv_selection[i][n]] = p;
+			}
+
+			if(uvChannel == UVChannel.UV)
+				selection[i].sharedMesh.uv = uvs;
+			else
+				selection[i].sharedMesh.uv2 = uvs;
+
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
+			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+		}
+	}
+
+	public void RotateUVs(int[][] uv_selection, Vector2 uvDelta)
+	{
+		Vector2 centerPoint = Center(uv_selection);
+		float theta = Mathf.Deg2Rad * (360f*uvDelta.y);
+
+		for(int i = 0; i < selection.Length; i++)
+		{
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			for(int n = 0; n < uv_selection[i].Length; n++)
+			{
+				Vector2 p = uvs[uv_selection[i][n]];
+				uvs[uv_selection[i][n]] = p.RotateAroundPoint(centerPoint, theta);			
 			}
 
 			if(uvChannel == UVChannel.UV)
@@ -1189,6 +1172,33 @@ public class UVeeWindow : EditorWindow {
 			for(int i = 0; i < v.Length; i++)
 				v[i] = mf.transform.TransformPoint(v[i]);
 			return v;
+		}
+	}
+
+	public static class VectorExtensions
+	{
+		public static Vector3 RotateAroundPoint(this Vector2 v, Vector2 origin, float theta)
+		{
+			// discard y val
+			float cx = origin.x, cy = origin.y;	// origin
+			float px = v.x, py = v.y;			// point
+
+			float s = Mathf.Sin(theta);
+			float c = Mathf.Cos(theta);
+
+			// translate point back to origin:
+			px -= cx;
+			py -= cy;
+
+			// rotate point
+			float xnew = px * c + py * s;
+			float ynew = -px * s + py * c;
+
+			// translate point back:
+			px = xnew + cx;
+			py = ynew + cy;
+			
+			return new Vector2(px, py);
 		}
 	}
 #endregion
