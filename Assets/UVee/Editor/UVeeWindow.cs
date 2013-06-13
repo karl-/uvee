@@ -84,7 +84,9 @@ public class UVeeWindow : EditorWindow {
 
 	Texture2D dot;
 	Texture2D moveTool;
-	Rect moveToolRect { get {
+	Texture2D rotateTool;
+	Texture2D scaleTool;
+	Rect TOOL_RECT { get {
 			int size = 32;// = moveTool.width / (100/workspace_scale);
 
 			return new Rect(
@@ -94,7 +96,7 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
-	Rect moveToolOutlineRect { get {
+	Rect TOOL_OUTLINE_RECT { get {
 			int size = 36;// = moveTool.width / (100/workspace_scale);
 
 			return new Rect(
@@ -104,8 +106,8 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
-	Color MOVE_TOOL_COLOR 			= Color.white;
-	Color MOVE_TOOL_COLOR_OUTLINE 	= Color.black;
+	Color TOOL_COLOR 			= Color.white;
+	Color TOOL_OUTLINE_COLOR 	= Color.black;
 
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
@@ -117,9 +119,9 @@ public class UVeeWindow : EditorWindow {
 
 	float scale = 0f;
 
-	int expandedSettingsHeight = 140;
-	int compactSettingsHeight = 50;
-	int settingsBoxHeight;
+	const int SETTINGS_BOX_EXPANDED = 160;
+	const int SETTINGS_BOX_COMPACT = 50;
+	private int settingsBoxHeight;
 
 	int settingsBoxPad = 10;
 	int PREFERENCES_MAX_WIDTH = 0;
@@ -130,6 +132,18 @@ public class UVeeWindow : EditorWindow {
 	bool dragging = false;
 
 	bool scrolling = false;
+#endregion
+
+#region UV MODIFICATION MEMBERS
+
+	const int UVTOOL_LENGTH = 4;
+	public enum UVTool {
+		None,
+		Move,
+		Scale,
+		Rotate
+	}
+	private UVTool tool = UVTool.None;
 #endregion
 
 #region INITIALIZATION
@@ -148,6 +162,8 @@ public class UVeeWindow : EditorWindow {
 
 		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
 		moveTool = (Texture2D)Resources.Load("move", typeof(Texture2D));
+		rotateTool = (Texture2D)Resources.Load("rotate", typeof(Texture2D));
+		scaleTool = (Texture2D)Resources.Load("scale", typeof(Texture2D));
 		PopulateColorArray();
 		OnSelectionChange();
 		Repaint();
@@ -384,7 +400,8 @@ public class UVeeWindow : EditorWindow {
 		//** Handle events **//
 		Event e = Event.current;
 
-		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition) && !moveToolRect.Contains(e.mousePosition))
+		// drag selection
+		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition) && !TOOL_RECT.Contains(e.mousePosition))
 		{
 			if(e.button == 2 || (e.modifiers == EventModifiers.Alt && e.button == 0))
 			{
@@ -431,9 +448,24 @@ public class UVeeWindow : EditorWindow {
 			}
 		}
 
-		// dragging uvs around
+		// dragging uvs around -- drawing takes place at the end of OnGUI
 		if(e.isMouse && e.button == 0 && e.modifiers == (EventModifiers)0 && !settingsBoxRect.Contains(e.mousePosition))
-			UVMoveTool();
+		{
+			switch(tool)
+			{
+				case UVTool.None:
+					break;
+				case UVTool.Move:
+					UVMoveTool();
+					break;
+				case UVTool.Scale:
+					UVScaleTool();
+					break;
+				case UVTool.Rotate:
+					UVRotateTool();
+					break;
+			}
+		}
 
 		if(e.type == EventType.MouseUp && e.button == 0 && mouseDragging) {
 			mouseDragging = false;
@@ -484,11 +516,7 @@ public class UVeeWindow : EditorWindow {
 		DrawPreferencesPane();
 
 		// Draw Move Tool iamge
-		GUI.color = MOVE_TOOL_COLOR_OUTLINE;
-			GUI.DrawTexture(moveToolOutlineRect, moveTool, ScaleMode.ScaleToFit, true, 0);
-		GUI.color = MOVE_TOOL_COLOR;
-			GUI.DrawTexture(moveToolRect, moveTool, ScaleMode.ScaleToFit, true, 0);
-		GUI.color = Color.white;
+		DrawToolTexture(tool); // alt method name : ToolTime();
 
 		if(mouseDragging) {
 			if(Vector2.Distance(drag_start, e.mousePosition) > 10)
@@ -648,7 +676,7 @@ public class UVeeWindow : EditorWindow {
 			{
 				GUILayout.BeginHorizontal();
 				GUILayout.BeginVertical();
-					settingsBoxHeight = expandedSettingsHeight;
+					settingsBoxHeight = SETTINGS_BOX_EXPANDED;
 					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
 					
 					GUI.changed = false;
@@ -679,28 +707,74 @@ public class UVeeWindow : EditorWindow {
 
 				GUILayout.EndVertical();
 				GUILayout.EndHorizontal();
+
+				// Toolbar
+				GUILayout.BeginHorizontal();
+
+					for(int i = 0; i < UVTOOL_LENGTH; i++)
+					{
+						if((int)tool == i) GUI.backgroundColor = Color.gray;
+						if(GUILayout.Button(((UVTool)i).ToString(), EditorStyles.toolbarButton))
+							tool = (UVTool)i;
+						GUI.backgroundColor = Color.white;
+					}
+
+				GUILayout.EndHorizontal();
 			}
 			else
-				settingsBoxHeight = compactSettingsHeight;
+				settingsBoxHeight = SETTINGS_BOX_COMPACT;
 		GUI.EndGroup();
+	}
+
+	private void DrawToolTexture(UVTool t)
+	{
+		switch(t)
+		{
+			case UVTool.None:
+				return;
+
+			case UVTool.Move:
+				GUI.color = TOOL_OUTLINE_COLOR;
+					GUI.DrawTexture(TOOL_OUTLINE_RECT, moveTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = TOOL_COLOR;
+					GUI.DrawTexture(TOOL_RECT, moveTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = Color.white;
+				break;
+
+			case UVTool.Rotate:
+				GUI.color = TOOL_OUTLINE_COLOR;
+					GUI.DrawTexture(TOOL_OUTLINE_RECT, rotateTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = TOOL_COLOR;
+					GUI.DrawTexture(TOOL_RECT, rotateTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = Color.white;
+				break;
+
+			case UVTool.Scale:
+				GUI.color = TOOL_OUTLINE_COLOR;
+					GUI.DrawTexture(TOOL_OUTLINE_RECT, scaleTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = TOOL_COLOR;
+					GUI.DrawTexture(TOOL_RECT, scaleTool, ScaleMode.ScaleToFit, true, 0);
+				GUI.color = Color.white;
+				break;
+		}
 	}
 #endregion
 
 #region TOOLS
 	
-	bool dragging_uv = false;
-	Vector2 dragging_uv_start = Vector2.zero;
+	bool dragging_tool = false;
+	Vector2 dragging_tool_start = Vector2.zero;
 	public void UVMoveTool()
 	{
 		Event e = Event.current;
-		if(e.type == EventType.MouseDown && moveToolRect.Contains(e.mousePosition)) 
+		if(e.type == EventType.MouseDown && TOOL_RECT.Contains(e.mousePosition)) 
 		{
 			for(int i = 0; i < selection.Length; i++)
 				if(!selection[i].sharedMesh.name.Contains("uvee-"))
 					CreateMeshInstance(selection[i]);
 
-			dragging_uv = true;
-			dragging_uv_start = e.mousePosition;
+			dragging_tool = true;
+			dragging_tool_start = e.mousePosition;
 
 			Undo.SetSnapshotTarget(Selection.transforms.GetMeshes() as Object[], "Move UVs");
 
@@ -710,20 +784,64 @@ public class UVeeWindow : EditorWindow {
 			Undo.RegisterSnapshot();
 		}
 
-		if(dragging_uv)
+		if(dragging_tool)
 		{
-			Vector2 delta = GUIToUVPoint(dragging_uv_start) - GUIToUVPoint(e.mousePosition);
+			Vector2 delta = GUIToUVPoint(dragging_tool_start) - GUIToUVPoint(e.mousePosition);
 
-			dragging_uv_start = e.mousePosition;
+			dragging_tool_start = e.mousePosition;
 			TranslateUVs(distinct_triangle_selection, delta);
 
 			UpdateGUIPointCache();
 			Repaint();
 		}
 
-		if((e.type == EventType.MouseUp || e.type == EventType.Ignore) && dragging_uv)
+		if((e.type == EventType.MouseUp || e.type == EventType.Ignore) && dragging_tool)
 		{
-			dragging_uv = false;
+			dragging_tool = false;
+			UpdateGUIPointCache();
+		}
+	}
+
+	public void UVRotateTool()
+	{
+
+	}
+
+	public void UVScaleTool()
+	{
+		Event e = Event.current;
+		if(e.type == EventType.MouseDown && TOOL_RECT.Contains(e.mousePosition)) 
+		{
+			for(int i = 0; i < selection.Length; i++)
+				if(!selection[i].sharedMesh.name.Contains("uvee-"))
+					CreateMeshInstance(selection[i]);
+
+			dragging_tool = true;
+			dragging_tool_start = e.mousePosition;
+
+			Undo.SetSnapshotTarget(Selection.transforms.GetMeshes() as Object[], "Scale UVs");
+
+			for(int i = 0; i < Selection.transforms.Length; i++)
+				EditorUtility.SetDirty(Selection.transforms[i]);
+			Undo.CreateSnapshot();
+			Undo.RegisterSnapshot();
+		}
+
+		if(dragging_tool)
+		{
+			Vector2 delta = GUIToUVPoint(dragging_tool_start) - GUIToUVPoint(e.mousePosition);
+
+			dragging_tool_start = e.mousePosition;
+			
+			ScaleUVs(distinct_triangle_selection, Vector2.one + delta);
+
+			UpdateGUIPointCache();
+			Repaint();
+		}
+
+		if((e.type == EventType.MouseUp || e.type == EventType.Ignore) && dragging_tool)
+		{
+			dragging_tool = false;
 			UpdateGUIPointCache();
 		}
 	}
@@ -741,6 +859,32 @@ public class UVeeWindow : EditorWindow {
 			for(int n = 0; n < uv_selection[i].Length; n++)
 			{
 				uvs[uv_selection[i][n]] -= d;
+			}
+
+			if(uvChannel == UVChannel.UV)
+				selection[i].sharedMesh.uv = uvs;
+			else
+				selection[i].sharedMesh.uv2 = uvs;
+
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
+			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+		}
+	}
+
+	public void ScaleUVs(int[][] uv_selection, Vector2 uvDelta)
+	{
+		Vector2 centerPoint = Center(uv_selection);
+
+		for(int i = 0; i < selection.Length; i++)
+		{
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			for(int n = 0; n < uv_selection[i].Length; n++)
+			{
+				Vector2 p = uvs[uv_selection[i][n]];
+				p -= centerPoint;
+				p.Scale(uvDelta);
+				p += centerPoint;
+				uvs[uv_selection[i][n]] = p;
 			}
 
 			if(uvChannel == UVChannel.UV)
@@ -844,6 +988,23 @@ public class UVeeWindow : EditorWindow {
 		float maxY = p0.y > p1.y ? p0.y : p1.y;
 
 		return new Rect(minX, minY, maxX - minX, maxY - minY);
+	}
+
+	public Vector2 Center(int[][] selected_uv_indices)
+	{
+		Vector2 v = Vector2.zero;
+		float count = 0f;
+
+		for(int i = 0; i < selected_uv_indices.Length; i++)
+		{
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			int[] sel = selected_uv_indices[i];
+
+			count += sel.Length;
+			for(int x = 0; x < sel.Length; x++)
+				v += uvs[sel[x]];
+		}
+		return v/count;
 	}
 
 	public Vector2 Vector2ArrayMin(Vector2[] val)
