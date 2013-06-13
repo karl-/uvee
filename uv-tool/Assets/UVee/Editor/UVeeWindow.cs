@@ -65,13 +65,19 @@ public class UVeeWindow : EditorWindow {
 	const int MAX_ZOOM = 2000;
 
 	const int LINE_WIDTH = 1;
-	Color LINE_COLOR = Color.gray;
+	Color LINE_COLOR;
 
 	const int UV_DOT_SIZE = 4;
 
 	Color[] COLOR_ARRAY = new Color[5];
 
-	Color DRAG_BOX_COLOR = new Color(.6f, .6f, .6f, .45f);
+	Color DRAG_BOX_COLOR_BASIC = new Color(0f, .7f, 1f, .2f);
+	Color DRAG_BOX_COLOR_PRO = new Color(0f, .7f, 1f, 1f);
+	Color DRAG_BOX_COLOR;
+
+	Color TRIANGLE_COLOR_BASIC = new Color(.2f, .2f, .2f, .2f);
+	Color TRIANGLE_COLOR_PRO = new Color(1f, 1f, 1f, .5f);
+	Color TRIANGLE_LINE_COLOR;
 #endregion
 
 #region GUI MEMBERS
@@ -136,6 +142,10 @@ public class UVeeWindow : EditorWindow {
 
 	public void OnEnable()
 	{	
+		LINE_COLOR = EditorGUIUtility.isProSkin ? Color.gray : Color.gray;
+		DRAG_BOX_COLOR = EditorGUIUtility.isProSkin ? DRAG_BOX_COLOR_PRO : DRAG_BOX_COLOR_BASIC;
+		TRIANGLE_LINE_COLOR = EditorGUIUtility.isProSkin ? TRIANGLE_COLOR_PRO : TRIANGLE_COLOR_BASIC;
+
 		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
 		moveTool = (Texture2D)Resources.Load("move", typeof(Texture2D));
 		PopulateColorArray();
@@ -151,6 +161,15 @@ public class UVeeWindow : EditorWindow {
 			SceneView.RepaintAll();
 
 			SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
+		}
+	}
+
+	public void HookSceneView()
+	{
+		if(SceneView.onSceneGUIDelegate != this.OnSceneGUI)
+		{
+			SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
+			SceneView.onSceneGUIDelegate += this.OnSceneGUI;
 		}
 	}
 #endregion
@@ -446,12 +465,13 @@ public class UVeeWindow : EditorWindow {
 		DrawGraphBase();
 
 		if(drawTriangles)
+		{
 			for(int i = 0; i < selected_triangles.Length; i++)
-				DrawLines(triangle_points[i], new Color(.2f, .2f, .2f, .2f));
+				DrawLines(triangle_points[i], TRIANGLE_LINE_COLOR);
 
-		if(drawTriangles)
 			for(int i = 0; i < selected_triangles.Length; i++)
 				DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
+		}
 
 		if(drawBoundingBox)
 			for(int i = 0; i < selection.Length; i++)
@@ -497,11 +517,7 @@ public class UVeeWindow : EditorWindow {
 			Repaint();
 		}
 
-		if(SceneView.onSceneGUIDelegate != this.OnSceneGUI)
-		{
-			SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
-			SceneView.onSceneGUIDelegate += this.OnSceneGUI;
-   		}
+		HookSceneView();
 	}
 #endregion
 
@@ -618,7 +634,7 @@ public class UVeeWindow : EditorWindow {
 		PREFERENCES_MAX_WIDTH = ((int)settingsBoxRect.width-settingsBoxPad*2) / 2 - settingsBoxPad;
 		Rect revertRect = new Rect(Screen.width-200-settingsBoxPad*2-10, 10, 200, 20);
 		Rect foldoutRect = new Rect(7, 10, 20, 20);
-
+		
 		GUI.Box(settingsBoxRect, "");
 		GUI.BeginGroup(settingsBoxRect);
 
@@ -658,6 +674,8 @@ public class UVeeWindow : EditorWindow {
 					GUI.changed = false;
 					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
 					if(GUI.changed) OnSelectionChange();
+
+					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
 
 				GUILayout.EndVertical();
 				GUILayout.EndHorizontal();
