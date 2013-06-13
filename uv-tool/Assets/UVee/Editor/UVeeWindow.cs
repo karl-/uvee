@@ -140,8 +140,8 @@ public class UVeeWindow : EditorWindow {
 	public enum UVTool {
 		None,
 		Move,
-		Scale,
-		Rotate
+		Rotate,
+		Scale
 	}
 	private UVTool tool = UVTool.None;
 #endregion
@@ -399,6 +399,26 @@ public class UVeeWindow : EditorWindow {
 
 		//** Handle events **//
 		Event e = Event.current;
+
+		// shortcut listining
+		if(e.isKey)
+		{
+			switch(e.keyCode)
+			{
+				case KeyCode.W:
+					tool = UVTool.Move;
+					break;
+				case KeyCode.E:
+					tool = UVTool.Rotate;
+					break;
+				case KeyCode.R:
+					tool = UVTool.Scale;
+					break;
+				case KeyCode.Q:
+					tool = UVTool.None;
+					break;
+			}
+		}
 
 		// drag selection
 		if(e.isMouse && !settingsBoxRect.Contains(e.mousePosition) && !TOOL_RECT.Contains(e.mousePosition))
@@ -787,7 +807,7 @@ public class UVeeWindow : EditorWindow {
 					TranslateUVs(distinct_triangle_selection, delta);
 					break;
 				case UVTool.Scale:
-					ScaleUVs(distinct_triangle_selection, Vector2.one + delta);
+					ScaleUVs(distinct_triangle_selection, Vector2.one + (-delta));
 					break;
 				case UVTool.Rotate:
 					RotateUVs(distinct_triangle_selection, delta);
