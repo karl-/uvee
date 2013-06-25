@@ -1,16 +1,6 @@
 #pragma warning disable 0649, 0219
 #define DEBUG
 
-// TODO ...(someday):
-//	- adding transform to selection undoes selection
-//	- Tile material preview
-//	- Click mesh to select uvs
-//	- rotate uvs
-//	- move per axis
-//	- scale uvs
-//	- snap to grid?
-//	- cut uvs
-//	- merge uvs (how would that work without screwing up vertices?)
 
 using UnityEngine;
 using UnityEditor;
@@ -718,8 +708,8 @@ public class UVeeWindow : EditorWindow {
 				GUILayout.Space(5);
 
 				// Toolbar
-				GUILayout.BeginHorizontal();
-
+				GUILayout.BeginHorizontal(GUILayout.MaxWidth(settingsBoxRect.width-2));
+					GUILayout.Space(1);
 					for(int i = 0; i < UVTOOL_LENGTH; i++)
 					{
 						if((int)tool == i) GUI.backgroundColor = Color.gray;
