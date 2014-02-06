@@ -190,7 +190,7 @@ public class UVeeWindow : EditorWindow {
 	public void UndoPerformed()
 	{
 		UpdateGUIPointCache();
-		foreach(Mesh m in Selection.transforms.GetMeshes())
+		foreach(Mesh m in Selection.transforms.GetMeshesUVee())
 		{
 			m.uv = m.uv;
 			m.uv2 = m.uv2;
@@ -775,7 +775,7 @@ public class UVeeWindow : EditorWindow {
 			dragging_tool = true;
 			dragging_tool_start = e.mousePosition;
 
-			Undo.SetSnapshotTarget(Selection.transforms.GetMeshes() as Object[], "Move UVs");
+			Undo.SetSnapshotTarget(Selection.transforms.GetMeshesUVee() as Object[], "Move UVs");
 
 			for(int i = 0; i < Selection.transforms.Length; i++)
 				EditorUtility.SetDirty(Selection.transforms[i]);
@@ -1133,7 +1133,7 @@ public class UVeeWindow : EditorWindow {
 			return c.ToArray() as T[];
 		}
 
-		public static Mesh[] GetMeshes(this Transform[] t_arr)
+		public static Mesh[] GetMeshesUVee(this Transform[] t_arr)
 		{
 			MeshFilter[] mfs = GetComponents<MeshFilter>(t_arr);
 			Mesh[] m = new Mesh[mfs.Length];
