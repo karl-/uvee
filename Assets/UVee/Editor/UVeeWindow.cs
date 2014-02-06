@@ -1161,7 +1161,7 @@ public class UVeeWindow : EditorWindow {
 			return c.ToArray() as GameObject[];
 		}
 
-		#if UNITY_4_0
+		#if UNITY_4
 		public static void SetIsReadable(this Mesh m, bool readable)
 		{
 			AssetImporter ai = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(m));
