@@ -1,6 +1,6 @@
-#pragma warning disable 0649, 0219
-#define DEBUG
-
+#if UNITY_4_0 || UNITY_4_0_1 || UNITY_4_1 || UNITY_4_2 || UNITY_4_3 || UNITY_4_3_0 || UNITY_4_3_1 || UNITY_4_3_2 || UNITY_4_3_3 || UNITY_4_3_4 || UNITY_4_3_5 || UNITY_4_3_6 || UNITY_4_3_7 || UNITY_4_3_8 || UNITY_4_3_9 || UNITY_4_4 || UNITY_4_4_0 || UNITY_4_4_1 || UNITY_4_4_2 || UNITY_4_4_3 || UNITY_4_4_4 || UNITY_4_4_5 || UNITY_4_4_6 || UNITY_4_4_7 || UNITY_4_4_8 || UNITY_4_4_9 || UNITY_4_5 || UNITY_4_5_0 || UNITY_4_5_1 || UNITY_4_5_2 || UNITY_4_5_3 || UNITY_4_5_4 || UNITY_4_5_5 || UNITY_4_5_6 || UNITY_4_5_7 || UNITY_4_5_8 || UNITY_4_5_9 || UNITY_4_6 || UNITY_4_6_0 || UNITY_4_6_1 || UNITY_4_6_2 || UNITY_4_6_3 || UNITY_4_6_4 || UNITY_4_6_5 || UNITY_4_6_6 || UNITY_4_6_7 || UNITY_4_6_8 || UNITY_4_6_9 || UNITY_4_7 || UNITY_4_7_0 || UNITY_4_7_1 || UNITY_4_7_2 || UNITY_4_7_3 || UNITY_4_7_4 || UNITY_4_7_5 || UNITY_4_7_6 || UNITY_4_7_7 || UNITY_4_7_8 || UNITY_4_7_9 || UNITY_4_8 || UNITY_4_8_0 || UNITY_4_8_1 || UNITY_4_8_2 || UNITY_4_8_3 || UNITY_4_8_4 || UNITY_4_8_5 || UNITY_4_8_6 || UNITY_4_8_7 || UNITY_4_8_8 || UNITY_4_8_9
+#define UNITY_4
+#endif
 
 using UnityEngine;
 using UnityEditor;
@@ -210,12 +210,18 @@ public class UVeeWindow : EditorWindow {
 		OnSelectionChange();
 	}
 
+		
+	public void OnHierarchyChange()
+	{
+		OnSelectionChange();
+	}
+
 	public void OnSelectionChange()
 	{
 		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
 
 		// I'm not sure why this is necessary, as the sharedMesh is never directly modified.  When in Rome, I reckon.
-		#if UNITY_4_0
+		#if UNITY_4
 		for(int i = 0; i < selection.Length; i++)
 		{
 			if(!selection[i].sharedMesh.isReadable)
@@ -550,6 +556,8 @@ public class UVeeWindow : EditorWindow {
 
 	public void OnSceneGUI(SceneView sceneView)
 	{
+		if(Selection.transforms.Length < 1) return;
+
 		for(int i = 0; i < selected_triangles.Length; i++)
 		{
 			Vector3[] v = TransformExtensions.VerticesInWorldSpace(selection[i]);
@@ -1071,7 +1079,7 @@ public class UVeeWindow : EditorWindow {
 #region DEBUG
 		
 	Dictionary<string, List<float>> methodExecutionTimes = new Dictionary<string, List<float>>();
-	public void LogMethodTime(string methodName, float time)
+	private void LogMethodTime(string methodName, float time)
 	{
 		if(methodExecutionTimes.ContainsKey(methodName))
 			methodExecutionTimes[methodName].Add(time);
@@ -1080,7 +1088,7 @@ public class UVeeWindow : EditorWindow {
 	}
 
 	Dictionary<string, float> timer = new Dictionary<string, float>();
-	public void LogStart(string methodName)
+	private void LogStart(string methodName)
 	{
 		if(methodExecutionTimes.ContainsKey(methodName))
 			timer[methodName] = (float)EditorApplication.timeSinceStartup;
@@ -1088,12 +1096,12 @@ public class UVeeWindow : EditorWindow {
 			timer.Add(methodName, (float)EditorApplication.timeSinceStartup);
 	}
 
-	public void LogFinish(string methodName)
+	private void LogFinish(string methodName)
 	{
 		LogMethodTime(methodName, (float)EditorApplication.timeSinceStartup - timer[methodName]);
 	}
 
-	public void DumpTimes()
+	private void DumpTimes()
 	{
 		foreach(KeyValuePair<string, List<float>> kvp in methodExecutionTimes)
 		{
@@ -1101,7 +1109,7 @@ public class UVeeWindow : EditorWindow {
 		}
 	}
 
-	public float Average(List<float> list)
+	private float Average(List<float> list)
 	{
 		float avg = 0f;
 		for(int i = 0; i < list.Count; i++)
@@ -1109,7 +1117,7 @@ public class UVeeWindow : EditorWindow {
 		return avg/(float)list.Count;
 	}
 
-	public Vector2 Average(List<Vector2> list)
+	private Vector2 Average(List<Vector2> list)
 	{
 		Vector2 avg = Vector2.zero;
 		for(int i = 0; i < list.Count; i++)
