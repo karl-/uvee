@@ -236,9 +236,9 @@ public class UVeeWindow : EditorWindow {
 
 		if(selection != null && selection.Length > 0)
 		{
-			// ??
-			Object t = selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
-			tex = (t == null) ? null : (Texture2D)t;
+
+			if(selection[0].GetComponent<MeshRenderer>() != null && selection[0].GetComponent<MeshRenderer>().sharedMaterial != null)
+				tex = (Texture2D)selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
 		}
 		
 		UpdateGUIPointCache();
@@ -298,7 +298,7 @@ public class UVeeWindow : EditorWindow {
 	}
 
 	// Call after UVs are selected, or the GUI space has been modified
-	public void UpdateGUIPointCache()
+	private void UpdateGUIPointCache()
 	{	
 		// LogStart("UpdateGUIPointCache");
 
@@ -362,7 +362,7 @@ public class UVeeWindow : EditorWindow {
 		// LogFinish("UpdateGUIPointCache");
 	}
 
-	public void ClearAll()
+	private void ClearAll()
 	{
 		uv_points 					= new Vector2[0][];
 		user_points 				= new Vector2[0][];
@@ -661,19 +661,23 @@ public class UVeeWindow : EditorWindow {
 		GUI.color = Color.white;
 	}
 
-	public void DrawPreferencesPane()
+	private void DrawPreferencesPane()
 	{
 		settingsBoxRect = new Rect(settingsBoxPad, settingsBoxPad, Screen.width-settingsBoxPad*2, settingsBoxHeight-settingsBoxPad);
 		PREFERENCES_MAX_WIDTH = ((int)settingsBoxRect.width-settingsBoxPad*2) / 2 - settingsBoxPad;
-		Rect revertRect = new Rect(Screen.width-200-settingsBoxPad*2-10, 10, 200, 20);
+		Rect revertRect = new Rect(Screen.width-95-settingsBoxPad*2-10, 10, 90, 20);
+		Rect exportRect = new Rect(Screen.width-190-settingsBoxPad*2-10, 10, 90, 20);
 		Rect foldoutRect = new Rect(7, 10, 20, 20);
 		
 		GUI.Box(settingsBoxRect, "");
 		GUI.BeginGroup(settingsBoxRect);
 
 			showPreferences = EditorGUI.Foldout(foldoutRect, showPreferences, "Preferences");
-			if(GUI.Button(revertRect, "Revert to Original"))
+			if(GUI.Button(revertRect, new GUIContent("Revert", "Reverts all changes made to the UV channel back to the original Mesh UV")))
 				Revert(selection);
+
+			if(GUI.Button(exportRect, new GUIContent("Export", "Exports a new Mesh copy and saves it to your project folder so that you can use this mesh with the modified UVs anywhere.")))
+				Export();
 
 			GUILayout.Space(foldoutRect.height+15);
 
@@ -909,12 +913,12 @@ public class UVeeWindow : EditorWindow {
 
 #region UTILITY
 
-	public Color RandomColor()
+	private Color RandomColor()
 	{
 		return new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1f);
 	}
 
-	public void Revert(MeshFilter[] mfs)
+	private void Revert(MeshFilter[] mfs)
 	{
 		foreach(MeshFilter mf in mfs)
 		{
@@ -924,9 +928,28 @@ public class UVeeWindow : EditorWindow {
 		EditorUtility.UnloadUnusedAssets();
 	}
 
-	public void CreateMeshInstance(MeshFilter mf)
+	
+	private void Export()
 	{
-		// why can't MemberwiseClone() work!?  blargh.
+		if(selection == null || selection.Length < 1) return;
+
+
+		string path = "Assets/UVee/Exported Meshes/";
+		if(!System.IO.Directory.Exists(path))
+			System.IO.Directory.CreateDirectory(path);
+
+		foreach(MeshFilter mf in selection)
+		{
+			if(mf.sharedMesh == null) continue;
+
+			AssetDatabase.CreateAsset( MeshInstance(mf), AssetDatabase.GenerateUniqueAssetPath(path + mf.name + ".asset"));
+		}
+
+		AssetDatabase.Refresh();
+	}
+
+	private void CreateMeshInstance(MeshFilter mf)
+	{
 		Mesh m = new Mesh();
 		m.vertices = mf.sharedMesh.vertices;
 		m.subMeshCount = mf.sharedMesh.subMeshCount;
@@ -946,6 +969,28 @@ public class UVeeWindow : EditorWindow {
 
 		PrefabUtility.DisconnectPrefabInstance(mf);
 		mf.sharedMesh = m;
+	}
+
+	private Mesh MeshInstance(MeshFilter mf)
+	{
+		Mesh m = new Mesh();
+		m.vertices = mf.sharedMesh.vertices;
+		m.subMeshCount = mf.sharedMesh.subMeshCount;
+		for(int i = 0; i < m.subMeshCount; i++)
+			m.SetTriangles(mf.sharedMesh.GetTriangles(i), i);
+		m.normals = mf.sharedMesh.normals;
+		m.uv = mf.sharedMesh.uv;
+		m.uv2 = mf.sharedMesh.uv2;
+		m.tangents = mf.sharedMesh.tangents;
+		m.colors = mf.sharedMesh.colors;
+		m.colors32 = mf.sharedMesh.colors32;
+		m.boneWeights = mf.sharedMesh.boneWeights;
+		m.bindposes = mf.sharedMesh.bindposes;
+		m.bounds = mf.sharedMesh.bounds;
+
+		m.name = "uvee-" + mf.sharedMesh.name;
+
+		return m;
 	}
 
 	public void PopulateColorArray()
