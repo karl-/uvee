@@ -59,6 +59,8 @@ public class UVeeWindow : EditorWindow {
 
 	const int UV_DOT_SIZE = 4;
 
+	const int TOOL_SIZE = 100;
+
 	Color[] COLOR_ARRAY = new Color[5];
 
 	Color DRAG_BOX_COLOR_BASIC = new Color(0f, .7f, 1f, .2f);
@@ -73,9 +75,7 @@ public class UVeeWindow : EditorWindow {
 #region GUI MEMBERS
 
 	Texture2D dot;
-	Texture2D moveTool;
-	Texture2D rotateTool;
-	Texture2D scaleTool;
+
 	Rect TOOL_RECT { get {
 			int size = 32;// = moveTool.width / (100/workspace_scale);
 
@@ -96,8 +96,6 @@ public class UVeeWindow : EditorWindow {
 				size);
 		}
 	}
-	Color TOOL_COLOR 			= Color.white;
-	Color TOOL_OUTLINE_COLOR 	= Color.black;
 
 	Vector2 center = new Vector2(0f, 0f);			// actual center
 	Vector2 workspace_origin = new Vector2(0f, 0f);	// where to start drawing in GUI space
@@ -149,11 +147,10 @@ public class UVeeWindow : EditorWindow {
 		LINE_COLOR = EditorGUIUtility.isProSkin ? Color.gray : Color.gray;
 		DRAG_BOX_COLOR = EditorGUIUtility.isProSkin ? DRAG_BOX_COLOR_PRO : DRAG_BOX_COLOR_BASIC;
 		TRIANGLE_LINE_COLOR = EditorGUIUtility.isProSkin ? TRIANGLE_COLOR_PRO : TRIANGLE_COLOR_BASIC;
-
+		
+		
 		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
-		moveTool = (Texture2D)Resources.Load("move", typeof(Texture2D));
-		rotateTool = (Texture2D)Resources.Load("rotate", typeof(Texture2D));
-		scaleTool = (Texture2D)Resources.Load("scale", typeof(Texture2D));
+
 		PopulateColorArray();
 		OnSelectionChange();
 		Repaint();
@@ -745,27 +742,15 @@ public class UVeeWindow : EditorWindow {
 				return;
 
 			case UVTool.Move:
-				GUI.color = TOOL_OUTLINE_COLOR;
-					GUI.DrawTexture(TOOL_OUTLINE_RECT, moveTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = TOOL_COLOR;
-					GUI.DrawTexture(TOOL_RECT, moveTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = Color.white;
+				uv_Handle_Utility.PositionHandle2d(1, TOOL_OUTLINE_RECT.center, TOOL_SIZE);
 				break;
 
 			case UVTool.Rotate:
-				GUI.color = TOOL_OUTLINE_COLOR;
-					GUI.DrawTexture(TOOL_OUTLINE_RECT, rotateTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = TOOL_COLOR;
-					GUI.DrawTexture(TOOL_RECT, rotateTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = Color.white;
+				uv_Handle_Utility.RotationHandle2d(1, TOOL_OUTLINE_RECT.center, 0, TOOL_SIZE) ;
 				break;
 
 			case UVTool.Scale:
-				GUI.color = TOOL_OUTLINE_COLOR;
-					GUI.DrawTexture(TOOL_OUTLINE_RECT, scaleTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = TOOL_COLOR;
-					GUI.DrawTexture(TOOL_RECT, scaleTool, ScaleMode.ScaleToFit, true, 0);
-				GUI.color = Color.white;
+				uv_Handle_Utility.ScaleHandle2d(1, TOOL_OUTLINE_RECT.center, Vector2.one, TOOL_SIZE);
 				break;
 		}
 	}
