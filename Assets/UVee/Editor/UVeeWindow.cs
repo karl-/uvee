@@ -11,8 +11,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-using Parabox.Bugger;
-
 public class UVeeWindow : EditorWindow {
 
 #region ENUM
@@ -500,7 +498,6 @@ public class UVeeWindow : EditorWindow {
 		 */
 		if(e.type == EventType.MouseUp || e.type == EventType.Ignore)
 		{
-			Debug.Log("MouseUp UVeeWindow");
 			movingUVs = false;
 			
 			uv_scale = Vector2.one;
@@ -696,18 +693,26 @@ public class UVeeWindow : EditorWindow {
 					settingsBoxHeight = SETTINGS_BOX_EXPANDED;
 					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
 					
-					GUI.changed = false;
-					uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
-					string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
-					submeshes[0] = "All";
-					for(int i = 1; i < submeshes.Length; i++)
-						submeshes[i] = (i-1).ToString();
-					submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					EditorGUI.BeginChangeCheck();
+		
+						uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+						string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
+						submeshes[0] = "All";
+						for(int i = 1; i < submeshes.Length; i++)
+							submeshes[i] = (i-1).ToString();
+						submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+						if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH)))
+						{
+							GenerateUV2(selection);
+							UpdateGUIPointCache();
+						}
 
-					if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH)))
+					if(EditorGUI.EndChangeCheck())
 					{
-						GenerateUV2(selection);
+						UpdateGUIPointCache();
+						Repaint();
 					}
+
 				GUILayout.EndVertical();
 
 				GUILayout.BeginVertical();
@@ -749,6 +754,11 @@ public class UVeeWindow : EditorWindow {
 #region TOOLS
 
 	bool movingUVs = false;
+
+	float SnapValue(float val, float snpVal)
+	{
+		return snpVal * Mathf.Round(val / snpVal);
+	}
 	
 	void MoveTool()
 	{
@@ -763,6 +773,12 @@ public class UVeeWindow : EditorWindow {
 				BeginModifyUVs();
 				
 			Vector2 delta = GUIToUVDirection( pos - center_origin );
+			
+			if(Event.current.modifiers == EventModifiers.Command || Event.current.modifiers == EventModifiers.Control)
+			{
+				delta.x = SnapValue(delta.x, .1f);
+				delta.y = SnapValue(delta.y, .1f);
+			}
 
 			TranslateUVs( delta );
 			
@@ -783,6 +799,9 @@ public class UVeeWindow : EditorWindow {
 			if(!movingUVs)
 				BeginModifyUVs();
 			
+			if(Event.current.modifiers == EventModifiers.Command || Event.current.modifiers == EventModifiers.Control)
+				uv_rotation = SnapValue(uv_rotation, 15f);
+
 			RotateUVs( uv_rotation );
 			
 			UpdateGUIPointCache();
@@ -802,6 +821,12 @@ public class UVeeWindow : EditorWindow {
 			if(!movingUVs)
 				BeginModifyUVs();
 			
+			if(Event.current.modifiers == EventModifiers.Command || Event.current.modifiers == EventModifiers.Control)
+			{
+				uv_scale.x = SnapValue(uv_scale.x, .1f);
+				uv_scale.y = SnapValue(uv_scale.y, .1f);
+			}
+
 			ScaleUVs( uv_scale );
 			
 			UpdateGUIPointCache();
@@ -820,8 +845,6 @@ public class UVeeWindow : EditorWindow {
 	Vector2 uv_scale = Vector2.one;
 	void BeginModifyUVs()
 	{
-		Debug.Log("BeginModifyUVs");
-
 		movingUVs = true;
 		center_origin = uv_center;
 		uv_center_origin = GUIToUVPoint(center_origin);		
