@@ -2,8 +2,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 
-using Parabox.Bugger;
-
 /**
  * Utilities for creating and manipulating Handles and points in GUI space, based on pb_Handle_Utility.cs
  */
@@ -172,7 +170,6 @@ public class UVee_HandleUtility
 				case EventType.MouseUp:
 				case EventType.Ignore:
 				  currentId = -1;
-				  Debug.Log("UVee_HandleUtility Ignore");
 				  break;
 			}
 		}
@@ -182,7 +179,6 @@ public class UVee_HandleUtility
 			{
 				if (Vector2.Distance(mousePosition, position) < width / 2)
 				{
-					Bugger.Log("MouseDown Handle");
 	
 					currentId = id;
 					handleOffset = position - mousePosition;
@@ -190,7 +186,6 @@ public class UVee_HandleUtility
 				}
 				else if (handleRectRight.Contains(mousePosition))
 				{
-					Bugger.Log("MouseDown Handle");
 					
 					currentId = id;
 					handleOffset = position - mousePosition;
@@ -198,7 +193,6 @@ public class UVee_HandleUtility
 				}
 				else if (handleRectUp.Contains(mousePosition))
 				{
-					Bugger.Log("MouseDown Handle");
 					
 					currentId = id;
 					handleOffset = position - mousePosition;
@@ -228,7 +222,7 @@ public class UVee_HandleUtility
 		{
 			Handles.color = Color.gray;
 			Handles.DrawLine(position, position + (mousePosition - position).normalized * radius);
-			GUI.Label(new Rect(position.x, position.y, 90f, 30f), newRotation.ToString("F2") + DEGREE_SYMBOL);
+			GUI.Box(new Rect(position.x, position.y, 90f, 30f), newRotation.ToString("F2") + DEGREE_SYMBOL);
 		}
 
 		// If a Tool already is engaged and it's not this one, bail.
