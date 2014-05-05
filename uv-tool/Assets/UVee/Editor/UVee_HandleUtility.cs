@@ -2,10 +2,12 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 
+using Parabox.Bugger;
+
 /**
  * Utilities for creating and manipulating Handles and points in GUI space, based on pb_Handle_Utility.cs
  */
-public class uv_Handle_Utility
+public class UVee_HandleUtility
 {
 
 	/**
@@ -170,27 +172,34 @@ public class uv_Handle_Utility
 				case EventType.MouseUp:
 				case EventType.Ignore:
 				  currentId = -1;
+				  Debug.Log("UVee_HandleUtility Ignore");
 				  break;
 			}
 		}
 	    else
 		{
-			if (e.type == EventType.MouseDown)
+			if (e.type == EventType.MouseDown && e.button == 0 && e.modifiers != EventModifiers.Alt)
 			{
 				if (Vector2.Distance(mousePosition, position) < width / 2)
 				{
+					Bugger.Log("MouseDown Handle");
+	
 					currentId = id;
 					handleOffset = position - mousePosition;
 					axisConstraint = new HandleConstraint2d(1, 1);
 				}
 				else if (handleRectRight.Contains(mousePosition))
 				{
+					Bugger.Log("MouseDown Handle");
+					
 					currentId = id;
 					handleOffset = position - mousePosition;
 					axisConstraint = new HandleConstraint2d(1, 0);
 				}
 				else if (handleRectUp.Contains(mousePosition))
 				{
+					Bugger.Log("MouseDown Handle");
+					
 					currentId = id;
 					handleOffset = position - mousePosition;
 					axisConstraint = new HandleConstraint2d(0, 1);
@@ -246,7 +255,7 @@ public class uv_Handle_Utility
 		}
 		else
 		{
-			if (e.type == EventType.MouseDown)
+			if (e.type == EventType.MouseDown && e.button == 0 && e.modifiers != EventModifiers.Alt)
 			{
 				if (Mathf.Abs(Vector2.Distance(mousePosition, position) - radius) < 8)
 				{
@@ -323,7 +332,7 @@ public class uv_Handle_Utility
 		}
 		else
 		{
-			if (e.type == EventType.MouseDown)
+			if (e.type == EventType.MouseDown && e.button == 0 && e.modifiers != EventModifiers.Alt)
 			{
 				if (handleRectCenter.Contains(mousePosition))
 				{

@@ -44,7 +44,10 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\Bugger\Editor\BuggerWindow.cs" />
+     <Compile Include="Assets\Bugger\Editor\DefineManager.cs" />
      <Compile Include="Assets\UVee\Editor\UVeeWindow.cs" />
+     <Compile Include="Assets\UVee\Editor\UVee_HandleUtility.cs" />
      <None Include="Assets\UVee\Example\credits.txt" />
  <Reference Include="AssetStoreTools">
  <HintPath>Assets\AssetStoreTools\Editor\AssetStoreTools.dll</HintPath>
@@ -52,6 +55,13 @@
  <Reference Include="AssetStoreToolsExtra">
  <HintPath>Assets\AssetStoreTools\Editor\AssetStoreToolsExtra.dll</HintPath>
  </Reference>
+ <Reference Include="Newtonsoft.Json">
+ <HintPath>Assets\Bugger\Newtonsoft.Json.dll</HintPath>
+ </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Assembly-CSharp-vs.csproj">
+      <Project>{5023CBBD-83B1-3C6D-65BC-10976AA5C15E}</Project>      <Name>Assembly-CSharp-vs</Name>    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
