@@ -135,6 +135,10 @@ public class UVeeWindow : EditorWindow {
 		PopulateColorArray();
 		OnSelectionChange();
 
+		#if UNITY_4_3
+			Undo.undoRedoPerformed += this.UndoRedoPerformed;
+		#endif
+
 		Repaint();
 	}
 	
@@ -161,7 +165,11 @@ public class UVeeWindow : EditorWindow {
 
 #region EVENT
 
-	public bool UndoRedoPerformed { get { return Event.current.type == EventType.ValidateCommand; } }// && Event.current.commandName == "UndoRedoPerformed"; } }
+	public bool UndoRedoPerformedEvent { get { return Event.current.type == EventType.ValidateCommand; } }// && Event.current.commandName == "UndoRedoPerformed"; } }
+	void UndoRedoPerformed()
+	{
+		Repaint();
+	}
 
 	int screenWidth = 0;
 	int screenHeight = 0;
@@ -345,11 +353,11 @@ public class UVeeWindow : EditorWindow {
 #region GUI
 	
 	// force update window
-	public void OnInspectorUpdate()
-	{
-		if(EditorWindow.focusedWindow != this)
-	    	Repaint();
-	}
+	// public void OnInspectorUpdate()
+	// {
+	// 	if(EditorWindow.focusedWindow != this)
+	//     	Repaint();
+	// }
 
 	Vector2 drag_start; 
 	bool mouseDragging = false;
@@ -365,7 +373,7 @@ public class UVeeWindow : EditorWindow {
 		Event e = Event.current;
 
 		// shortcut listining
-		if(e.isKey)
+		if(e.isKey && e.type == EventType.KeyUp)
 		{
 			needsRepaint = true;
 
@@ -388,6 +396,9 @@ public class UVeeWindow : EditorWindow {
 					needsRepaint = false;
 					break;
 			}
+
+			if(needsRepaint)	
+				e.Use();
 		}
 
 		// drag selection
@@ -541,7 +552,7 @@ public class UVeeWindow : EditorWindow {
 			needsRepaint = true;
 		}
 
-		if(UndoRedoPerformed) {
+		if(UndoRedoPerformedEvent) {
 			needsRepaint = true;
 		}
 
@@ -780,6 +791,10 @@ public class UVeeWindow : EditorWindow {
 				delta.y = SnapValue(delta.y, .1f);
 			}
 
+			#if UNITY_4_3
+			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
+			#endif
+
 			TranslateUVs( delta );
 			
 			UpdateGUIPointCache();
@@ -802,6 +817,9 @@ public class UVeeWindow : EditorWindow {
 			if(Event.current.modifiers == EventModifiers.Command || Event.current.modifiers == EventModifiers.Control)
 				uv_rotation = SnapValue(uv_rotation, 15f);
 
+			#if UNITY_4_3
+			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
+			#endif
 			RotateUVs( uv_rotation );
 			
 			UpdateGUIPointCache();
@@ -827,6 +845,9 @@ public class UVeeWindow : EditorWindow {
 				uv_scale.y = SnapValue(uv_scale.y, .1f);
 			}
 
+			#if UNITY_4_3
+			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
+			#endif
 			ScaleUVs( uv_scale );
 			
 			UpdateGUIPointCache();
@@ -861,9 +882,11 @@ public class UVeeWindow : EditorWindow {
 			System.Array.Copy(uvs, uv_origins[i], uvs.Length);
 		}
 
+		#if !UNITY_4_3
 		Undo.SetSnapshotTarget(Selection.transforms.GetMeshesUVee() as Object[], "Move UVs");
 		Undo.CreateSnapshot();
 		Undo.RegisterSnapshot();
+		#endif
 
 		for(int i = 0; i < Selection.transforms.Length; i++)
 			EditorUtility.SetDirty(Selection.transforms[i]);
