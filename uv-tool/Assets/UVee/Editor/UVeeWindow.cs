@@ -106,6 +106,7 @@ public class UVeeWindow : EditorWindow {
 	bool scrolling = false;
 
 	Vector2 setPosition = Vector2.zero;
+	float setRotation = 90f;
 #endregion
 
 #region UV MODIFICATION MEMBERS
@@ -689,6 +690,8 @@ public class UVeeWindow : EditorWindow {
 		Rect exportRect = new Rect(Screen.width-190-settingsBoxPad*2-10, 10, 90, 20);
 		Rect foldoutRect = new Rect(7, 10, 20, 20);
 		
+		int SEG_WIDTH = PREFERENCES_MAX_WIDTH/2;
+
 		GUI.Box(settingsBoxRect, "");
 		GUI.BeginGroup(settingsBoxRect);
 
@@ -704,19 +707,20 @@ public class UVeeWindow : EditorWindow {
 			if(showPreferences)
 			{
 				GUILayout.BeginHorizontal();
+				
 				GUILayout.BeginVertical();
 					settingsBoxHeight = SETTINGS_BOX_EXPANDED;
-					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					
 					EditorGUI.BeginChangeCheck();
 		
-						uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+						uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 						string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
 						submeshes[0] = "All";
 						for(int i = 1; i < submeshes.Length; i++)
 							submeshes[i] = (i-1).ToString();
-						submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
-						if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH)))
+						submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+						if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH)))
 						{
 							GenerateUV2(selection);
 							UpdateGUIPointCache();
@@ -731,13 +735,13 @@ public class UVeeWindow : EditorWindow {
 				GUILayout.EndVertical();
 
 				GUILayout.BeginVertical();
-					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					
-					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
-					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
 					GUI.changed = false;
-					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					if(GUI.changed) OnSelectionChange();
 
 					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
@@ -745,12 +749,45 @@ public class UVeeWindow : EditorWindow {
 				GUILayout.EndVertical();
 
 				GUILayout.BeginVertical();
-					maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
-					
-					setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH/2));
+						
+					switch(tool)
+					{
+						case UVTool.Rotate:
+							
+							setRotation = EditorGUILayout.FloatField("Rotation", setRotation, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
-					if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(PREFERENCES_MAX_WIDTH/2))))	
-						SetUVPosition(setPosition, maintainSpacing);
+							if(GUILayout.Button("Set Rotation", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+							{
+								BeginModifyUVs();
+								RotateUVs(setRotation);
+								UpdateGUIPointCache();
+							}
+							break;
+
+						case UVTool.Scale:
+							setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+							if(GUILayout.Button("Set Scale", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+							{
+								BeginModifyUVs();
+								ScaleUVs(setPosition);
+								UpdateGUIPointCache();
+							}
+							break;
+
+						default:
+							setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+							maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+							if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+							{
+								BeginModifyUVs();
+								SetUVPosition(setPosition, maintainSpacing);
+								UpdateGUIPointCache();
+							}
+							break;
+					}
 
 					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
 
