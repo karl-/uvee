@@ -29,6 +29,8 @@ public class UVeeWindow : EditorWindow {
 	bool showTex = true;
 	bool drawBoundingBox = false;
 	bool drawTriangles = true;
+
+	bool maintainSpacing = true;
 	// bool drawNonSelectedPoints = true;
 #endregion
 
@@ -102,6 +104,8 @@ public class UVeeWindow : EditorWindow {
 	bool dragging = false;
 
 	bool scrolling = false;
+
+	Vector2 setPosition = Vector2.zero;
 #endregion
 
 #region UV MODIFICATION MEMBERS
@@ -739,6 +743,18 @@ public class UVeeWindow : EditorWindow {
 					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
 
 				GUILayout.EndVertical();
+
+				GUILayout.BeginVertical();
+					maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH));
+					
+					setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(PREFERENCES_MAX_WIDTH/2));
+
+					if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(PREFERENCES_MAX_WIDTH/2))))	
+						SetUVPosition(setPosition, maintainSpacing);
+
+					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
+
+				GUILayout.EndVertical();
 				GUILayout.EndHorizontal();
 
 				GUILayout.Space(5);
@@ -903,6 +919,38 @@ public class UVeeWindow : EditorWindow {
 
 			foreach(int n in selected_triangles[i])
 				uvs[n] = uv_origins[i][n] + uvDelta;
+
+			if(uvChannel == UVChannel.UV)
+				selection[i].sharedMesh.uv = uvs;
+			else
+				selection[i].sharedMesh.uv2 = uvs;
+
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
+			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+		}
+	}
+
+	/**
+	 * Set the UV position of all selected Uvs exactly to this point.  If maintainSpacing is true,
+	 * the relative positions of UV coordinates will be preserved.  If false, each point will be
+	 * collapsed to `pos`.
+	 */
+	private void SetUVPosition(Vector2 pos, bool maintainSpacing)
+	{
+		for(int i = 0; i < selection.Length; i++)
+		{	
+			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+
+			Vector2 cen = Vector2.zero;
+
+			int[] dist = selected_triangles[i].Distinct().ToArray();
+			foreach(int n in dist)
+				cen += uvs[n];
+
+			cen /= (float)dist.Length;
+
+			foreach(int n in selected_triangles[i])
+				uvs[n] = maintainSpacing ? (pos + (cen- uvs[n])) : pos;
 
 			if(uvChannel == UVChannel.UV)
 				selection[i].sharedMesh.uv = uvs;
