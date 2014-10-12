@@ -30,7 +30,7 @@ public class UVeeWindow : EditorWindow {
 	bool drawBoundingBox = false;
 	bool drawTriangles = true;
 
-	bool maintainSpacing = true;
+	// bool maintainSpacing = true;
 	// bool drawNonSelectedPoints = true;
 #endregion
 
@@ -39,7 +39,7 @@ public class UVeeWindow : EditorWindow {
 	MeshFilter[] selection = new MeshFilter[0];
 	int submesh = 0;
 	HashSet<int>[] selected_triangles = new HashSet<int>[0];
-	Texture2D tex;
+	Texture tex;
 
 	// GUI draw caches
 	Vector2[][] 	uv_points 		= new Vector2[0][];			// all uv points
@@ -50,7 +50,6 @@ public class UVeeWindow : EditorWindow {
 
 	// selection caches
 	int[][]			distinct_triangle_selection = new int[0][];	///< Guarantees that only one index per vertex is present
-
 	bool[] 			validChannel	= new bool[0]{};
 #endregion
 
@@ -75,6 +74,9 @@ public class UVeeWindow : EditorWindow {
 	Color TRIANGLE_COLOR_BASIC = new Color(.2f, .2f, .2f, .2f);
 	Color TRIANGLE_COLOR_PRO = new Color(1f, 1f, 1f, .5f);
 	Color TRIANGLE_LINE_COLOR;
+
+	const float ALT_SCROLL_MODIFIER = .07f;
+	const float SCROLL_MODIFIER = .5f;
 #endregion
 
 #region GUI MEMBERS
@@ -105,8 +107,8 @@ public class UVeeWindow : EditorWindow {
 
 	bool scrolling = false;
 
-	Vector2 setPosition = Vector2.zero;
-	float setRotation = 90f;
+	// Vector2 setPosition = Vector2.zero;
+	// float setRotation = 90f;
 #endregion
 
 #region UV MODIFICATION MEMBERS
@@ -227,6 +229,7 @@ public class UVeeWindow : EditorWindow {
 		}
 		
 		UpdateGUIPointCache();
+		Repaint();
 	}
 
 	private void UpdateSelectionWithGUIRect(Rect rect, bool shift)
@@ -356,13 +359,6 @@ public class UVeeWindow : EditorWindow {
 #endregion
 
 #region GUI
-	
-	// force update window
-	// public void OnInspectorUpdate()
-	// {
-	// 	if(EditorWindow.focusedWindow != this)
-	//     	Repaint();
-	// }
 
 	Vector2 drag_start; 
 	bool mouseDragging = false;
@@ -750,44 +746,47 @@ public class UVeeWindow : EditorWindow {
 
 				GUILayout.BeginVertical();
 						
-					switch(tool)
-					{
-						case UVTool.Rotate:
+					tex = TexturePopup(Selection.transforms, SEG_WIDTH);
+
+					// ABSOLUTE POSITIONING
+					// switch(tool)
+					// {
+					// 	case UVTool.Rotate:
 							
-							setRotation = EditorGUILayout.FloatField("Rotation", setRotation, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					// 		setRotation = EditorGUILayout.FloatField("Rotation", setRotation, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
-							if(GUILayout.Button("Set Rotation", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-							{
-								BeginModifyUVs();
-								RotateUVs(setRotation);
-								UpdateGUIPointCache();
-							}
-							break;
+					// 		if(GUILayout.Button("Set Rotation", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+					// 		{
+					// 			BeginModifyUVs();
+					// 			RotateUVs(setRotation);
+					// 			UpdateGUIPointCache();
+					// 		}
+					// 		break;
 
-						case UVTool.Scale:
-							setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					// 	case UVTool.Scale:
+					// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
-							if(GUILayout.Button("Set Scale", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-							{
-								BeginModifyUVs();
-								ScaleUVs(setPosition);
-								UpdateGUIPointCache();
-							}
-							break;
+					// 		if(GUILayout.Button("Set Scale", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+					// 		{
+					// 			BeginModifyUVs();
+					// 			ScaleUVs(setPosition);
+					// 			UpdateGUIPointCache();
+					// 		}
+					// 		break;
 
-						default:
-							setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					// 	default:
+					// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
-							maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					// 		maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
-							if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-							{
-								BeginModifyUVs();
-								SetUVPosition(setPosition, maintainSpacing);
-								UpdateGUIPointCache();
-							}
-							break;
-					}
+					// 		if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+					// 		{
+					// 			BeginModifyUVs();
+					// 			SetUVPosition(setPosition, maintainSpacing);
+					// 			UpdateGUIPointCache();
+					// 		}
+					// 		break;
+					// }
 
 					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
 
@@ -1061,6 +1060,62 @@ public class UVeeWindow : EditorWindow {
 #endregion
 
 #region UTILITY
+
+	int mat_selected = 0;
+	List<Texture> mat_textures = new List<Texture>();
+	string[] mat_names = new string[0]{};
+	int[] mat_values = new int[0] {};
+	string[] EMPTY_STRING_ARRAY = new string[0] {};
+	int[] EMPTY_INT_ARRAY = new int[0] {};
+
+	Texture TexturePopup(Transform[] transforms, int maxWidth)
+	{
+		Material[] materials = TransformExtensions.GetComponents<MeshRenderer>(transforms).SelectMany(x => x.sharedMaterials).ToArray();
+
+		if(materials == null || materials.Length < 1)
+		{
+			EditorGUILayout.IntPopup(0, EMPTY_STRING_ARRAY, EMPTY_INT_ARRAY, GUILayout.MaxWidth(maxWidth));
+			return null;
+		}
+
+		mat_textures = materials.SelectMany(x => GetTextures(x)).ToList();
+
+		if(mat_textures.Count < 1)
+		{
+			EditorGUILayout.IntPopup(0, EMPTY_STRING_ARRAY, EMPTY_INT_ARRAY, GUILayout.MaxWidth(maxWidth));
+			return null;
+		}
+
+		mat_names = mat_textures.Select(x => x.name).ToArray();
+
+		mat_values = new int[mat_names.Length];
+
+		for(int i = 0; i < mat_names.Length; i++)
+			mat_values[i] = i;
+
+		mat_selected = EditorGUILayout.IntPopup(mat_selected, mat_names, mat_values, GUILayout.MaxWidth(maxWidth));
+
+		return mat_textures[ (int)Mathf.Clamp(mat_selected, 0, mat_names.Length-1) ];
+	}
+
+	List<Texture> GetTextures(Material material)
+	{
+		List<Texture> list = new List<Texture>();
+
+		var count = ShaderUtil.GetPropertyCount(material.shader);
+		for(var i = 0; i < count; i++)
+		{
+			if(ShaderUtil.GetPropertyType(material.shader, i) == ShaderUtil.ShaderPropertyType.TexEnv)
+			{
+				string name = ShaderUtil.GetPropertyName(material.shader, i);
+				Texture t = (Texture)material.GetTexture(name);
+
+				if(t != null)
+					list.Add( t );
+			}
+		}
+		return list;
+	}
 
 	private Color RandomColor()
 	{
