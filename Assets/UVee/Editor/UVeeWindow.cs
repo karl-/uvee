@@ -1,10 +1,3 @@
-#if UNITY_4_3 || UNITY_4_3_0 || UNITY_4_3_1 || UNITY_4_3_2 || UNITY_4_3_3 || UNITY_4_3_4 || UNITY_4_3_5 || UNITY_4_3_6 || UNITY_4_3_7 || UNITY_4_3_8 || UNITY_4_3_9 || UNITY_4_4 || UNITY_4_4_0 || UNITY_4_4_1 || UNITY_4_4_2 || UNITY_4_4_3 || UNITY_4_4_4 || UNITY_4_4_5 || UNITY_4_4_6 || UNITY_4_4_7 || UNITY_4_4_8 || UNITY_4_4_9 || UNITY_4_5 || UNITY_4_5_0 || UNITY_4_5_1 || UNITY_4_5_2 || UNITY_4_5_3 || UNITY_4_5_4 || UNITY_4_5_5 || UNITY_4_5_6 || UNITY_4_5_7 || UNITY_4_5_8 || UNITY_4_5_9 || UNITY_4_6 || UNITY_4_6_0 || UNITY_4_6_1 || UNITY_4_6_2 || UNITY_4_6_3 || UNITY_4_6_4 || UNITY_4_6_5 || UNITY_4_6_6 || UNITY_4_6_7 || UNITY_4_6_8 || UNITY_4_6_9 || UNITY_4_7 || UNITY_4_7_0 || UNITY_4_7_1 || UNITY_4_7_2 || UNITY_4_7_3 || UNITY_4_7_4 || UNITY_4_7_5 || UNITY_4_7_6 || UNITY_4_7_7 || UNITY_4_7_8 || UNITY_4_7_9 || UNITY_4_8 || UNITY_4_8_0 || UNITY_4_8_1 || UNITY_4_8_2 || UNITY_4_8_3 || UNITY_4_8_4 || UNITY_4_8_5 || UNITY_4_8_6 || UNITY_4_8_7 || UNITY_4_8_8 || UNITY_4_8_9
-#define UNITY_4_3
-#endif
-#if UNITY_4_0 || UNITY_4_0_1 || UNITY_4_1 || UNITY_4_2 || UNITY_4_3 || UNITY_4_3_0 || UNITY_4_3_1 || UNITY_4_3_2 || UNITY_4_3_3 || UNITY_4_3_4 || UNITY_4_3_5 || UNITY_4_3_6 || UNITY_4_3_7 || UNITY_4_3_8 || UNITY_4_3_9 || UNITY_4_4 || UNITY_4_4_0 || UNITY_4_4_1 || UNITY_4_4_2 || UNITY_4_4_3 || UNITY_4_4_4 || UNITY_4_4_5 || UNITY_4_4_6 || UNITY_4_4_7 || UNITY_4_4_8 || UNITY_4_4_9 || UNITY_4_5 || UNITY_4_5_0 || UNITY_4_5_1 || UNITY_4_5_2 || UNITY_4_5_3 || UNITY_4_5_4 || UNITY_4_5_5 || UNITY_4_5_6 || UNITY_4_5_7 || UNITY_4_5_8 || UNITY_4_5_9 || UNITY_4_6 || UNITY_4_6_0 || UNITY_4_6_1 || UNITY_4_6_2 || UNITY_4_6_3 || UNITY_4_6_4 || UNITY_4_6_5 || UNITY_4_6_6 || UNITY_4_6_7 || UNITY_4_6_8 || UNITY_4_6_9 || UNITY_4_7 || UNITY_4_7_0 || UNITY_4_7_1 || UNITY_4_7_2 || UNITY_4_7_3 || UNITY_4_7_4 || UNITY_4_7_5 || UNITY_4_7_6 || UNITY_4_7_7 || UNITY_4_7_8 || UNITY_4_7_9 || UNITY_4_8 || UNITY_4_8_0 || UNITY_4_8_1 || UNITY_4_8_2 || UNITY_4_8_3 || UNITY_4_8_4 || UNITY_4_8_5 || UNITY_4_8_6 || UNITY_4_8_7 || UNITY_4_8_8 || UNITY_4_8_9
-#define UNITY_4
-#endif
-
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
@@ -13,11 +6,91 @@ using System.Linq;
 
 public class UVeeWindow : EditorWindow {
 
-#region ENUM
+#region ENUM / CLASS
 
 	public enum UVChannel {
 		UV,
 		UV2
+	}
+
+	/**
+	 * Basically generic MeshFilter / SkinnedMeshRenderer type. 
+	 */
+	public class MeshSelection
+	{
+		public MeshSelection(MeshFilter mf)
+		{
+			meshFilter = mf;
+			skinnedMeshRenderer = null;
+		}
+
+		public MeshSelection(SkinnedMeshRenderer smr)
+		{
+			meshFilter = null;
+			skinnedMeshRenderer = smr;
+		}
+
+		public MeshSelection(Transform t)
+		{
+			if(t.GetComponent<MeshFilter>())
+			{
+				meshFilter = t.GetComponent<MeshFilter>();
+			}
+			else if (t.GetComponent<SkinnedMeshRenderer>())
+			{
+				skinnedMeshRenderer = t.GetComponent<SkinnedMeshRenderer>();
+			}
+			else
+			{
+				meshFilter = null;
+				skinnedMeshRenderer = null;
+			}
+		}
+
+		MeshFilter meshFilter;
+		SkinnedMeshRenderer skinnedMeshRenderer;
+
+		public GameObject gameObject
+		{
+			get
+			{
+				return meshFilter != null ? meshFilter.gameObject : (skinnedMeshRenderer != null ? skinnedMeshRenderer.gameObject : null);
+			}
+		}
+
+		public Renderer renderer
+		{
+			get
+			{
+				return meshFilter != null ? (Renderer)meshFilter.GetComponent<MeshRenderer>() : (Renderer)skinnedMeshRenderer;
+			}
+		}
+
+		public Mesh sharedMesh
+		{
+			get
+			{
+				return meshFilter != null ? meshFilter.sharedMesh : (skinnedMeshRenderer == null ? null : skinnedMeshRenderer.sharedMesh);
+			}
+
+			set
+			{
+				if(meshFilter != null)
+					meshFilter.sharedMesh = value;
+				else if(skinnedMeshRenderer != null)
+					skinnedMeshRenderer.sharedMesh = value;
+				else
+					Debug.LogError("MeshSelection is null");
+			}
+		}
+
+		public Object rawObject
+		{
+			get
+			{
+				return (Object)meshFilter ?? (Object)skinnedMeshRenderer;
+			}
+		}
 	}
 #endregion
 
@@ -27,7 +100,6 @@ public class UVeeWindow : EditorWindow {
 	UVChannel uvChannel = UVChannel.UV;
 	bool showCoordinates = false;
 	bool showTex = true;
-	bool drawBoundingBox = false;
 	bool drawTriangles = true;
 
 	// bool maintainSpacing = true;
@@ -36,7 +108,7 @@ public class UVeeWindow : EditorWindow {
 
 #region DATA
 
-	MeshFilter[] selection = new MeshFilter[0];
+	MeshSelection[] selection = new MeshSelection[0];
 	int submesh = 0;
 	HashSet<int>[] selected_triangles = new HashSet<int>[0];
 	Texture tex;
@@ -137,14 +209,12 @@ public class UVeeWindow : EditorWindow {
 		DRAG_BOX_COLOR = EditorGUIUtility.isProSkin ? DRAG_BOX_COLOR_PRO : DRAG_BOX_COLOR_BASIC;
 		TRIANGLE_LINE_COLOR = EditorGUIUtility.isProSkin ? TRIANGLE_COLOR_PRO : TRIANGLE_COLOR_BASIC;
 		
-		dot = (Texture2D)Resources.Load("dot", typeof(Texture2D));
+		dot = EditorGUIUtility.whiteTexture;// (Texture2D)Resources.Load("dot", typeof(Texture2D));
 
 		PopulateColorArray();
 		OnSelectionChange();
 
-		#if UNITY_4_3
-			Undo.undoRedoPerformed += this.UndoRedoPerformed;
-		#endif
+		Undo.undoRedoPerformed += this.UndoRedoPerformed;
 
 		Repaint();
 	}
@@ -201,16 +271,19 @@ public class UVeeWindow : EditorWindow {
 
 	public void OnSelectionChange()
 	{
-		selection = TransformExtensions.GetComponents<MeshFilter>(Selection.transforms);
+		List<Transform> validMeshTransforms = Selection.transforms.Where(x => x.GetComponent<MeshFilter>() || x.GetComponent<SkinnedMeshRenderer>()).ToList();
+		selection = new MeshSelection[validMeshTransforms.Count];
+		for(int i = 0; i < validMeshTransforms.Count; i++)
+		{
+			selection[i] = new MeshSelection(validMeshTransforms[i]);
+		}
 
 		// I'm not sure why this is necessary, as the sharedMesh is never directly modified.
-		#if UNITY_4
 		for(int i = 0; i < selection.Length; i++)
 		{
 			if(!selection[i].sharedMesh.isReadable)
 				selection[i].sharedMesh.SetIsReadable(true);
 		}
-		#endif
 
 		selected_triangles = new HashSet<int>[selection.Length];
 
@@ -220,9 +293,9 @@ public class UVeeWindow : EditorWindow {
 		if(selection != null && selection.Length > 0)
 		{
 
-			if(selection[0].GetComponent<MeshRenderer>() != null && selection[0].GetComponent<MeshRenderer>().sharedMaterial != null)
+			if(selection[0].renderer != null && selection[0].renderer.sharedMaterial != null)
 			{
-				Object t = selection[0].GetComponent<MeshRenderer>().sharedMaterial.mainTexture;
+				Object t = selection[0].renderer.sharedMaterial.mainTexture;
 				if( t is Texture2D)
 					tex = (Texture2D)t;
 			}
@@ -528,10 +601,6 @@ public class UVeeWindow : EditorWindow {
 				DrawLines(user_triangle_points[i], COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 		}
 
-		if(drawBoundingBox)
-			for(int i = 0; i < selection.Length; i++)
-				DrawBoundingBox(user_points[i]);
-
 		for(int i = 0; i < selection.Length; i++)
 			DrawPoints( user_points[i] );//, COLOR_ARRAY[i%COLOR_ARRAY.Length]);
 
@@ -559,9 +628,9 @@ public class UVeeWindow : EditorWindow {
 
 		if(needsRepaint)
 		{
-			Repaint();
-
 			UpdateGUIPointCache();
+			
+			Repaint();
 			needsRepaint = false;
 		}
 
@@ -731,8 +800,7 @@ public class UVeeWindow : EditorWindow {
 				GUILayout.EndVertical();
 
 				GUILayout.BeginVertical();
-					drawBoundingBox = EditorGUILayout.Toggle("Draw Containing Box", drawBoundingBox, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-					
+				
 					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
@@ -843,10 +911,6 @@ public class UVeeWindow : EditorWindow {
 				delta.y = SnapValue(delta.y, .1f);
 			}
 
-			#if UNITY_4_3
-			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
-			#endif
-
 			TranslateUVs( delta );
 			
 			UpdateGUIPointCache();
@@ -869,9 +933,6 @@ public class UVeeWindow : EditorWindow {
 			if(Event.current.modifiers == EventModifiers.Command || Event.current.modifiers == EventModifiers.Control)
 				uv_rotation = SnapValue(uv_rotation, 15f);
 
-			#if UNITY_4_3
-			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
-			#endif
 			RotateUVs( uv_rotation );
 			
 			UpdateGUIPointCache();
@@ -897,9 +958,6 @@ public class UVeeWindow : EditorWindow {
 				uv_scale.y = SnapValue(uv_scale.y, .1f);
 			}
 
-			#if UNITY_4_3
-			Undo.RecordObjects(Selection.transforms.GetMeshesUVee(), "Modify UVs");
-			#endif
 			ScaleUVs( uv_scale );
 			
 			UpdateGUIPointCache();
@@ -925,20 +983,25 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
+
 			if(!selection[i].sharedMesh.name.Contains("uvee-"))
+			{
+				Undo.RecordObject(selection[i].rawObject, "Modify UVs");
 				CreateMeshInstance(selection[i]);
-			
+			}
+			else
+			{
+				Undo.RecordObject(selection[i].rawObject, "Modify UVs");
+				// Mesh old = selection[i].sharedMesh;
+				CreateMeshInstance(selection[i]);
+				// Undo.DestroyObjectImmediate(old);
+			}			
+
 			// copy origin uvs
 			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
 			uv_origins[i] = new Vector2[uvs.Length];
 			System.Array.Copy(uvs, uv_origins[i], uvs.Length);
 		}
-
-		#if !UNITY_4_3
-		Undo.SetSnapshotTarget(Selection.transforms.GetMeshesUVee() as Object[], "Move UVs");
-		Undo.CreateSnapshot();
-		Undo.RegisterSnapshot();
-		#endif
 
 		for(int i = 0; i < Selection.transforms.Length; i++)
 			EditorUtility.SetDirty(Selection.transforms[i]);
@@ -961,8 +1024,8 @@ public class UVeeWindow : EditorWindow {
 			else
 				selection[i].sharedMesh.uv2 = uvs;
 
-			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
-			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
+			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
 		}
 	}
 
@@ -993,8 +1056,8 @@ public class UVeeWindow : EditorWindow {
 			else
 				selection[i].sharedMesh.uv2 = uvs;
 
-			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
-			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
+			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
 		}
 	}
 
@@ -1021,8 +1084,8 @@ public class UVeeWindow : EditorWindow {
 			else
 				selection[i].sharedMesh.uv2 = uvs;
 
-			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
-			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
+			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
 		}
 	}
 
@@ -1045,12 +1108,12 @@ public class UVeeWindow : EditorWindow {
 			else
 				selection[i].sharedMesh.uv2 = uvs;
 
-			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i]);
-			PrefabUtility.SetPropertyModifications(selection[i], propmods);
+			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
+			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
 		}
 	}
 
-	public void GenerateUV2(MeshFilter[] selection)
+	public void GenerateUV2(MeshSelection[] selection)
 	{
 		for(int i = 0; i < selection.Length; i++)
 		{
@@ -1070,7 +1133,7 @@ public class UVeeWindow : EditorWindow {
 
 	Texture TexturePopup(Transform[] transforms, int maxWidth)
 	{
-		Material[] materials = TransformExtensions.GetComponents<MeshRenderer>(transforms).SelectMany(x => x.sharedMaterials).ToArray();
+		Material[] materials = selection.SelectMany(x => x.renderer.sharedMaterials).ToArray();
 
 		if(materials == null || materials.Length < 1)
 		{
@@ -1122,12 +1185,12 @@ public class UVeeWindow : EditorWindow {
 		return new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1f);
 	}
 
-	private void Revert(MeshFilter[] mfs)
+	private void Revert(MeshSelection[] mfs)
 	{
-		foreach(MeshFilter mf in mfs)
+		foreach(MeshSelection mf in mfs)
 		{
 			PrefabUtility.ReconnectToLastPrefab(mf.gameObject);
-			PrefabUtility.ResetToPrefabState(mf);
+			PrefabUtility.ResetToPrefabState(mf.rawObject);
 		}
 		EditorUtility.UnloadUnusedAssets();
 	}
@@ -1142,17 +1205,17 @@ public class UVeeWindow : EditorWindow {
 		if(!System.IO.Directory.Exists(path))
 			System.IO.Directory.CreateDirectory(path);
 
-		foreach(MeshFilter mf in selection)
+		foreach(MeshSelection mf in selection)
 		{
 			if(mf.sharedMesh == null) continue;
 
-			AssetDatabase.CreateAsset( MeshInstance(mf), AssetDatabase.GenerateUniqueAssetPath(path + mf.name + ".asset"));
+			AssetDatabase.CreateAsset( MeshInstance(mf), AssetDatabase.GenerateUniqueAssetPath(path + mf.rawObject.name + ".asset"));
 		}
 
 		AssetDatabase.Refresh();
 	}
 
-	private void CreateMeshInstance(MeshFilter mf)
+	private void CreateMeshInstance(MeshSelection mf)
 	{
 		// Mesh m = new Mesh();
 		// m.vertices = mf.sharedMesh.vertices;
@@ -1172,13 +1235,15 @@ public class UVeeWindow : EditorWindow {
 		// m.name = "uvee-" + mf.sharedMesh.name;
 
 		Mesh m = MeshInstance(mf);
-		PrefabUtility.DisconnectPrefabInstance(mf);
+		PrefabUtility.DisconnectPrefabInstance(mf.rawObject);
+		Undo.RegisterCreatedObjectUndo(m, "Modify UVs");
 		mf.sharedMesh = m;
 	}
 
-	private Mesh MeshInstance(MeshFilter mf)
+	private Mesh MeshInstance(MeshSelection mf)
 	{
 		Mesh m = new Mesh();
+
 		m.vertices = mf.sharedMesh.vertices;
 		m.subMeshCount = mf.sharedMesh.subMeshCount;
 		for(int i = 0; i < m.subMeshCount; i++)
@@ -1210,7 +1275,7 @@ public class UVeeWindow : EditorWindow {
 		COLOR_ARRAY[4] = Color.magenta;
 	}
 
-	public Vector2[] UVArrayWithTriangles(MeshFilter mf, int[] tris)
+	public Vector2[] UVArrayWithTriangles(MeshSelection mf, int[] tris)
 	{
 		List<Vector2> uvs = new List<Vector2>();
 
@@ -1434,7 +1499,6 @@ public class UVeeWindow : EditorWindow {
 			return c.ToArray() as GameObject[];
 		}
 
-		#if UNITY_4
 		public static void SetIsReadable(this Mesh m, bool readable)
 		{
 			AssetImporter ai = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(m));
@@ -1443,7 +1507,6 @@ public class UVeeWindow : EditorWindow {
 
 			AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
 		}	
-		#endif
 
 		public static string ToFormattedString(this int[] arr, string seperator)
 		{
@@ -1457,11 +1520,11 @@ public class UVeeWindow : EditorWindow {
 			return str;
 		}
 
-		public static Vector3[] VerticesInWorldSpace(MeshFilter mf)
+		public static Vector3[] VerticesInWorldSpace(UVeeWindow.MeshSelection mf)
 		{
 			Vector3[] v = mf.sharedMesh.vertices;
 			for(int i = 0; i < v.Length; i++)
-				v[i] = mf.transform.TransformPoint(v[i]);
+				v[i] = mf.gameObject.transform.TransformPoint(v[i]);
 			return v;
 		}
 	}
