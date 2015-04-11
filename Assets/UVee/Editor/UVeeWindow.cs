@@ -14,7 +14,9 @@ public class UVeeWindow : EditorWindow {
 	}
 
 	/**
-	 * Basically generic MeshFilter / SkinnedMeshRenderer type. 
+	 * Generic MeshFilter / SkinnedMeshRenderer type, implemented because
+	 * we need to access similar properties in both, and can't treat them
+	 * both as the same type.
 	 */
 	public class MeshSelection
 	{
@@ -165,7 +167,7 @@ public class UVeeWindow : EditorWindow {
 
 	float scale = 0f;
 
-	const int SETTINGS_BOX_EXPANDED = 160;
+	const int SETTINGS_BOX_EXPANDED = 114;
 	const int SETTINGS_BOX_COMPACT = 50;
 	private int settingsBoxHeight;
 
@@ -487,6 +489,7 @@ public class UVeeWindow : EditorWindow {
 						dragging = true;
 					}
 
+					// pan canvas
 					if(dragging) {
 						offset = offset + (e.mousePosition - start);
 						start = e.mousePosition;
@@ -761,13 +764,16 @@ public class UVeeWindow : EditorWindow {
 		GUI.BeginGroup(settingsBoxRect);
 
 			showPreferences = EditorGUI.Foldout(foldoutRect, showPreferences, "Preferences");
+
+			EditorGUIUtility.labelWidth = 100;
+
 			if(GUI.Button(revertRect, new GUIContent("Revert", "Reverts all changes made to the UV channel back to the original Mesh UV")))
 				Revert(selection);
 
 			if(GUI.Button(exportRect, new GUIContent("Export", "Exports a new Mesh copy and saves it to your project folder so that you can use this mesh with the modified UVs anywhere.")))
 				Export();
 
-			GUILayout.Space(foldoutRect.height+15);
+			GUILayout.Space(foldoutRect.height + 20);
 
 			if(showPreferences)
 			{
@@ -777,14 +783,23 @@ public class UVeeWindow : EditorWindow {
 					settingsBoxHeight = SETTINGS_BOX_EXPANDED;
 					workspace_scale = EditorGUILayout.IntSlider("Scale", workspace_scale, MIN_ZOOM, MAX_ZOOM, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					
+					GUILayout.Space(3);
 					EditorGUI.BeginChangeCheck();
 		
 						uvChannel = (UVChannel)EditorGUILayout.EnumPopup("UV Channel", uvChannel, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+				GUILayout.EndVertical();
+
+				GUILayout.BeginVertical();
 						string[] submeshes = new string[ (selection != null && selection.Length > 0) ? selection[0].sharedMesh.subMeshCount+1 : 1];
+
 						submeshes[0] = "All";
+
 						for(int i = 1; i < submeshes.Length; i++)
 							submeshes[i] = (i-1).ToString();
+
 						submesh = EditorGUILayout.Popup("Submesh", submesh, submeshes, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+						
 						if(GUILayout.Button("Generate UV2", GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH)))
 						{
 							GenerateUV2(selection);
@@ -796,72 +811,76 @@ public class UVeeWindow : EditorWindow {
 						UpdateGUIPointCache();
 						Repaint();
 					}
-
 				GUILayout.EndVertical();
+
+				GUILayout.Space(10);
 
 				GUILayout.BeginVertical();
 				
-					showCoordinates = EditorGUILayout.Toggle("Display Coordinates", showCoordinates, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-					drawTriangles = EditorGUILayout.Toggle("Draw Triangles", drawTriangles, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-
-					GUI.changed = false;
-					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-					if(GUI.changed) OnSelectionChange();
-
-					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
+					showCoordinates = EditorGUILayout.Toggle("Coordinates", showCoordinates, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					drawTriangles = EditorGUILayout.Toggle("Triangles", drawTriangles, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 
 				GUILayout.EndVertical();
 
 				GUILayout.BeginVertical();
-						
+					GUI.changed = false;
+					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+					if(GUI.changed) OnSelectionChange();
+				
 					tex = TexturePopup(Selection.transforms, SEG_WIDTH);
-
-					// ABSOLUTE POSITIONING
-					// switch(tool)
-					// {
-					// 	case UVTool.Rotate:
-							
-					// 		setRotation = EditorGUILayout.FloatField("Rotation", setRotation, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-
-					// 		if(GUILayout.Button("Set Rotation", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-					// 		{
-					// 			BeginModifyUVs();
-					// 			RotateUVs(setRotation);
-					// 			UpdateGUIPointCache();
-					// 		}
-					// 		break;
-
-					// 	case UVTool.Scale:
-					// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-
-					// 		if(GUILayout.Button("Set Scale", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-					// 		{
-					// 			BeginModifyUVs();
-					// 			ScaleUVs(setPosition);
-					// 			UpdateGUIPointCache();
-					// 		}
-					// 		break;
-
-					// 	default:
-					// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-
-					// 		maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
-
-					// 		if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(SEG_WIDTH))))
-					// 		{
-					// 			BeginModifyUVs();
-					// 			SetUVPosition(setPosition, maintainSpacing);
-					// 			UpdateGUIPointCache();
-					// 		}
-					// 		break;
-					// }
-
-					// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
-
 				GUILayout.EndVertical();
+
+				// GUILayout.BeginVertical();	
+
+				// 	// ABSOLUTE POSITIONING
+				// 	// switch(tool)
+				// 	// {
+				// 	// 	case UVTool.Rotate:
+							
+				// 	// 		setRotation = EditorGUILayout.FloatField("Rotation", setRotation, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+				// 	// 		if(GUILayout.Button("Set Rotation", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+				// 	// 		{
+				// 	// 			BeginModifyUVs();
+				// 	// 			RotateUVs(setRotation);
+				// 	// 			UpdateGUIPointCache();
+				// 	// 		}
+				// 	// 		break;
+
+				// 	// 	case UVTool.Scale:
+				// 	// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+				// 	// 		if(GUILayout.Button("Set Scale", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+				// 	// 		{
+				// 	// 			BeginModifyUVs();
+				// 	// 			ScaleUVs(setPosition);
+				// 	// 			UpdateGUIPointCache();
+				// 	// 		}
+				// 	// 		break;
+
+				// 	// 	default:
+				// 	// 		setPosition = EditorGUILayout.Vector2Field("Position", setPosition, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+				// 	// 		maintainSpacing = EditorGUILayout.Toggle("Maintain Spacing", maintainSpacing, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
+
+				// 	// 		if(GUILayout.Button("Set Position", GUILayout.MaxWidth((int)(SEG_WIDTH))))
+				// 	// 		{
+				// 	// 			BeginModifyUVs();
+				// 	// 			SetUVPosition(setPosition, maintainSpacing);
+				// 	// 			UpdateGUIPointCache();
+				// 	// 		}
+				// 	// 		break;
+				// 	// }
+
+				// 	// DRAG_BOX_COLOR = EditorGUILayout.ColorField("Drag Box", DRAG_BOX_COLOR);
+
+				// GUILayout.EndVertical();
+				
+				GUILayout.FlexibleSpace();
+
 				GUILayout.EndHorizontal();
 
-				GUILayout.Space(5);
+				GUILayout.Space(8);
 
 				// Toolbar
 				GUILayout.BeginHorizontal(GUILayout.MaxWidth(settingsBoxRect.width-2));
@@ -993,7 +1012,7 @@ public class UVeeWindow : EditorWindow {
 			{
 				Undo.RecordObject(selection[i].rawObject, "Modify UVs");
 				// Mesh old = selection[i].sharedMesh;
-				CreateMeshInstance(selection[i]);
+				// CreateMeshInstance(selection[i]);
 				// Undo.DestroyObjectImmediate(old);
 			}			
 
@@ -1192,7 +1211,11 @@ public class UVeeWindow : EditorWindow {
 			PrefabUtility.ReconnectToLastPrefab(mf.gameObject);
 			PrefabUtility.ResetToPrefabState(mf.rawObject);
 		}
+		#if UNITY_5
+		EditorUtility.UnloadUnusedAssetsImmediate();
+		#else
 		EditorUtility.UnloadUnusedAssets();
+		#endif
 	}
 
 	
