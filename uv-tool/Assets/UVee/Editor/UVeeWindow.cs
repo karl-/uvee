@@ -10,7 +10,11 @@ public class UVeeWindow : EditorWindow {
 
 	public enum UVChannel {
 		UV,
-		UV2
+		UV2,
+#if UNITY_5
+		UV3,
+		UV4
+#endif
 	}
 
 	/**
@@ -374,7 +378,7 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			uv_points[i] = UVToGUIPoint((uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2);
+			uv_points[i] = UVToGUIPoint( GetUVChannel(selection[i].sharedMesh, uvChannel) );
 			if(uv_points[i] == null || uv_points[i].Length < 1)
 			{
 				user_points[i]					= new Vector2[0]{};
@@ -421,6 +425,50 @@ public class UVeeWindow : EditorWindow {
 
 		// LogFinish("UpdateGUIPointCache");
 	}
+
+ 	Vector2[] GetUVChannel(Mesh m, UVChannel channel)
+ 	{
+ 		switch(channel)
+ 		{		
+ 			case UVChannel.UV2:
+ 				return m.uv2;
+
+#if UNITY_5
+ 			case UVChannel.UV3:
+ 				return m.uv3;
+
+ 			case UVChannel.UV4:
+ 				return m.uv4;
+#endif
+
+ 			default:
+ 				return m.uv;
+ 		}
+ 	}
+
+ 	void SetUVChannel(Mesh m, UVChannel channel, Vector2[] uvs)
+ 	{
+ 		switch(channel)
+ 		{		
+ 			case UVChannel.UV2:
+ 				m.uv2 = uvs;
+ 				break;
+
+#if UNITY_5
+ 			case UVChannel.UV3:
+ 				m.uv3 = uvs;
+ 				break;
+
+ 			case UVChannel.UV4:
+ 				m.uv4 = uvs;
+ 				break;
+#endif
+
+ 			default:
+ 				m.uv = uvs;
+ 				break;
+ 		}
+ 	}
 
 	private void ClearAll()
 	{
@@ -636,8 +684,6 @@ public class UVeeWindow : EditorWindow {
 			Repaint();
 			needsRepaint = false;
 		}
-
-		HookSceneView();
 	}
 #endregion
 
@@ -645,7 +691,7 @@ public class UVeeWindow : EditorWindow {
 
 	public void OnSceneGUI(SceneView sceneView)
 	{
-		if(Selection.transforms.Length < 1) return;
+		if(Selection.transforms.Length < 1 || selection.Length != selected_triangles.Length) return;
 
 		for(int i = 0; i < selected_triangles.Length; i++)
 		{
@@ -826,8 +872,10 @@ public class UVeeWindow : EditorWindow {
 					GUI.changed = false;
 					showTex = EditorGUILayout.Toggle("Display Texture", showTex, GUILayout.MaxWidth(SEG_WIDTH), GUILayout.MinWidth(SEG_WIDTH));
 					if(GUI.changed) OnSelectionChange();
-				
+
+					GUI.enabled = showTex;				
 					tex = TexturePopup(Selection.transforms, SEG_WIDTH);
+					GUI.enabled = true;				
 				GUILayout.EndVertical();
 
 				// GUILayout.BeginVertical();	
@@ -1017,7 +1065,7 @@ public class UVeeWindow : EditorWindow {
 			}			
 
 			// copy origin uvs
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
 			uv_origins[i] = new Vector2[uvs.Length];
 			System.Array.Copy(uvs, uv_origins[i], uvs.Length);
 		}
@@ -1033,15 +1081,12 @@ public class UVeeWindow : EditorWindow {
 	{
 		for(int i = 0; i < selection.Length; i++)
 		{	
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
 
 			foreach(int n in selected_triangles[i])
 				uvs[n] = uv_origins[i][n] + uvDelta;
 
-			if(uvChannel == UVChannel.UV)
-				selection[i].sharedMesh.uv = uvs;
-			else
-				selection[i].sharedMesh.uv2 = uvs;
+			SetUVChannel(selection[i].sharedMesh, uvChannel, uvs);
 
 			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
 			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
@@ -1057,7 +1102,7 @@ public class UVeeWindow : EditorWindow {
 	{
 		for(int i = 0; i < selection.Length; i++)
 		{	
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
 
 			Vector2 cen = Vector2.zero;
 
@@ -1070,10 +1115,7 @@ public class UVeeWindow : EditorWindow {
 			foreach(int n in selected_triangles[i])
 				uvs[n] = maintainSpacing ? (pos + (cen- uvs[n])) : pos;
 
-			if(uvChannel == UVChannel.UV)
-				selection[i].sharedMesh.uv = uvs;
-			else
-				selection[i].sharedMesh.uv2 = uvs;
+			SetUVChannel(selection[i].sharedMesh, uvChannel, uvs);
 
 			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
 			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
@@ -1085,7 +1127,7 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
 
 			foreach(int n in selected_triangles[i])
 			{
@@ -1098,10 +1140,7 @@ public class UVeeWindow : EditorWindow {
 				uvs[n] = p;
 			}
 
-			if(uvChannel == UVChannel.UV)
-				selection[i].sharedMesh.uv = uvs;
-			else
-				selection[i].sharedMesh.uv2 = uvs;
+			SetUVChannel(selection[i].sharedMesh, uvChannel, uvs);
 
 			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
 			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
@@ -1114,7 +1153,7 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selection.Length; i++)
 		{
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
 			
 			foreach(int n in selected_triangles[i])
 			{
@@ -1122,10 +1161,7 @@ public class UVeeWindow : EditorWindow {
 				uvs[n] = p.RotateAroundPoint(uv_center_origin, theta);			
 			}
 
-			if(uvChannel == UVChannel.UV)
-				selection[i].sharedMesh.uv = uvs;
-			else
-				selection[i].sharedMesh.uv2 = uvs;
+			SetUVChannel(selection[i].sharedMesh, uvChannel, uvs);
 
 			PropertyModification[] propmods = PrefabUtility.GetPropertyModifications(selection[i].rawObject);
 			PrefabUtility.SetPropertyModifications(selection[i].rawObject, propmods);
@@ -1302,7 +1338,7 @@ public class UVeeWindow : EditorWindow {
 	{
 		List<Vector2> uvs = new List<Vector2>();
 
-		Vector2[] mf_uv = (uvChannel == UVChannel.UV) ? mf.sharedMesh.uv : mf.sharedMesh.uv2;
+		Vector2[] mf_uv = GetUVChannel(mf.sharedMesh, uvChannel);
 		
 		if(mf_uv == null)
 			return new Vector2[0]{};
@@ -1336,7 +1372,8 @@ public class UVeeWindow : EditorWindow {
 
 		for(int i = 0; i < selected_uv_indices.Length; i++)
 		{
-			Vector2[] uvs = (uvChannel == UVChannel.UV) ? selection[i].sharedMesh.uv : selection[i].sharedMesh.uv2;
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
+
 			int[] sel = selected_uv_indices[i];
 
 			count += sel.Length;
@@ -1545,6 +1582,9 @@ public class UVeeWindow : EditorWindow {
 
 		public static Vector3[] VerticesInWorldSpace(UVeeWindow.MeshSelection mf)
 		{
+			if(mf == null || mf.gameObject == null || mf.sharedMesh == null)
+				return new Vector3[0];
+
 			Vector3[] v = mf.sharedMesh.vertices;
 			for(int i = 0; i < v.Length; i++)
 				v[i] = mf.gameObject.transform.TransformPoint(v[i]);
