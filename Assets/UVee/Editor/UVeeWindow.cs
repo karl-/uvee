@@ -8,7 +8,8 @@ public class UVeeWindow : EditorWindow {
 
 #region ENUM / CLASS
 
-	public enum UVChannel {
+	public enum UVChannel 
+	{
 		UV,
 		UV2,
 #if UNITY_5
@@ -488,6 +489,27 @@ public class UVeeWindow : EditorWindow {
 	bool zoom_dragging = false;
 	Vector2 zoom_dragging_start = Vector2.zero;
 	bool needsRepaint = false;
+
+	void CopyUVsToChannel(object channel)
+	{
+		for(int i = 0; i < selection.Length; i++)
+		{	
+			Vector2[] uvs = GetUVChannel(selection[i].sharedMesh, uvChannel);
+			// unity bug requires we copy mesh data like this
+			// Vector3[] v = selection[i].sharedMesh.vertices;
+			// Vector3[] n = selection[i].sharedMesh.normals;
+			int[][] t = new int[selection[i].sharedMesh.subMeshCount][];
+			for(int iter = 0; iter < t.Length; iter++)
+				t[i] = selection[i].sharedMesh.GetIndices(iter);
+
+			SetUVChannel(selection[i].sharedMesh, (UVChannel)channel, uvs);
+			// selection[i].sharedMesh.vertices = v;
+			// selection[i].sharedMesh.normals = n;
+			for(int iter = 0; iter < t.Length; iter++)
+				selection[i].sharedMesh.SetIndices(t[iter], selection[i].sharedMesh.GetTopology(iter), iter);
+		}
+	}
+
 	void OnGUI()
 	{
 		if(Screen.width != screenWidth || Screen.height != screenHeight)
@@ -495,6 +517,18 @@ public class UVeeWindow : EditorWindow {
 
 		//** Handle events **//
 		Event e = Event.current;
+
+		if(e.type == EventType.ContextClick)
+		{
+			GenericMenu menu = new GenericMenu();
+			menu.AddItem(new GUIContent("Copy UVs To Channel/" + UVChannel.UV, "Copies the currently displayed UV channel to another channel."), false, CopyUVsToChannel, UVChannel.UV);
+			menu.AddItem(new GUIContent("Copy UVs To Channel/" + UVChannel.UV2, "Copies the currently displayed UV channel to another channel."), false, CopyUVsToChannel, UVChannel.UV2);
+#if UNITY_5
+			menu.AddItem(new GUIContent("Copy UVs To Channel/" + UVChannel.UV3, "Copies the currently displayed UV channel to another channel."), false, CopyUVsToChannel, UVChannel.UV3);
+			menu.AddItem(new GUIContent("Copy UVs To Channel/" + UVChannel.UV4, "Copies the currently displayed UV channel to another channel."), false, CopyUVsToChannel, UVChannel.UV4);
+#endif
+			menu.ShowAsContext();
+		}
 
 		// shortcut listining
 		if(e.isKey && e.type == EventType.KeyUp)
